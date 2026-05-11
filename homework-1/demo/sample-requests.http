@@ -1,0 +1,64 @@
+@baseUrl = http://localhost:3000
+
+### Create transaction A
+POST {{baseUrl}}/transactions
+Content-Type: application/json
+
+{
+  "fromAccount": "ACC-12345",
+  "toAccount": "ACC-67890",
+  "amount": 100.5,
+  "currency": "USD",
+  "type": "transfer"
+}
+
+### Create transaction B
+POST {{baseUrl}}/transactions
+Content-Type: application/json
+
+{
+  "fromAccount": "ACC-77777",
+  "toAccount": "ACC-12345",
+  "amount": 250,
+  "currency": "EUR",
+  "type": "deposit"
+}
+
+### Create transaction C
+POST {{baseUrl}}/transactions
+Content-Type: application/json
+
+{
+  "fromAccount": "ACC-12345",
+  "toAccount": "ACC-55555",
+  "amount": 40,
+  "currency": "USD",
+  "type": "withdrawal"
+}
+
+### Get all transactions
+GET {{baseUrl}}/transactions
+
+### Filter transactions by account
+GET {{baseUrl}}/transactions?accountId=ACC-12345
+
+### Get account balance
+GET {{baseUrl}}/accounts/ACC-12345/balance
+
+### Get account summary
+GET {{baseUrl}}/accounts/ACC-12345/summary
+
+### Get simple interest
+GET {{baseUrl}}/accounts/ACC-12345/interest?rate=0.05&days=30
+
+### Optional: validation error example
+POST {{baseUrl}}/transactions
+Content-Type: application/json
+
+{
+  "fromAccount": "BAD-111",
+  "toAccount": "ACC-12345",
+  "amount": -50,
+  "currency": "XYZ",
+  "type": "payment"
+}
