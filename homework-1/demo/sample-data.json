@@ -1,0 +1,27 @@
+{
+  "transactionA": {
+    "fromAccount": "ACC-12345",
+    "toAccount": "ACC-67890",
+    "amount": 100.5,
+    "currency": "USD",
+    "type": "transfer"
+  },
+  "transactionB": {
+    "fromAccount": "ACC-77777",
+    "toAccount": "ACC-12345",
+    "amount": 250,
+    "currency": "EUR",
+    "type": "deposit"
+  },
+  "transactionC": {
+    "fromAccount": "ACC-12345",
+    "toAccount": "ACC-55555",
+    "amount": 40,
+    "currency": "USD",
+    "type": "withdrawal"
+  },
+  "interestQuery": {
+    "rate": 0.05,
+    "days": 30
+  }
+}
