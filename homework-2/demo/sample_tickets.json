@@ -1,0 +1,46 @@
+[
+  {
+    "customer_id": "C-201",
+    "customer_email": "laura@globex.com",
+    "customer_name": "Laura Chen",
+    "subject": "Security vulnerability found",
+    "description": "We discovered a security issue in the API endpoint. This is a critical security concern that needs immediate attention.",
+    "metadata": { "source": "api" }
+  },
+  {
+    "customer_id": "C-202",
+    "customer_email": "mike@globex.com",
+    "customer_name": "Mike Torres",
+    "subject": "Refund for duplicate charge",
+    "description": "I was charged twice for the same invoice last month. Please process a refund for the duplicate billing charge.",
+    "tags": ["billing", "refund"],
+    "metadata": { "source": "email" }
+  },
+  {
+    "customer_id": "C-203",
+    "customer_email": "nina@globex.com",
+    "customer_name": "Nina Patel",
+    "subject": "Feature request: bulk export",
+    "description": "Please add a bulk export feature for reports. This enhancement would greatly improve our workflow.",
+    "tags": ["feature", "export"],
+    "metadata": { "source": "web_form", "browser": "Chrome", "device_type": "desktop" }
+  },
+  {
+    "customer_id": "C-204",
+    "customer_email": "omar@globex.com",
+    "customer_name": "Omar Hassan",
+    "subject": "Cannot reset password",
+    "description": "I cannot reset my password. The reset email never arrives and I am locked out of my account.",
+    "tags": ["account", "password"],
+    "metadata": { "source": "chat" }
+  },
+  {
+    "customer_id": "C-205",
+    "customer_email": "paula@globex.com",
+    "customer_name": "Paula Smith",
+    "subject": "App throwing 500 error",
+    "description": "Getting a 500 internal server error when clicking the submit button. Happens every time, easy to reproduce.",
+    "tags": ["error", "bug"],
+    "metadata": { "source": "web_form", "browser": "Firefox", "device_type": "desktop" }
+  }
+]

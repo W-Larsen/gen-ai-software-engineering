@@ -1,0 +1,12 @@
+{
+  "tickets": [
+    {
+      "customer_id": "C-300",
+      "customer_email": "gina@example.com",
+      "customer_name": "Gina",
+      "subject": "Minor cosmetic issue",
+      "description": "Just a minor cosmetic suggestion about the dashboard layout.",
+      "metadata": { "source": "chat" }
+    }
+  ]
+}

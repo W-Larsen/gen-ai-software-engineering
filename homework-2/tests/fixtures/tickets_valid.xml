@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tickets>
+  <ticket>
+    <customer_id>C-400</customer_id>
+    <customer_email>henry@example.com</customer_email>
+    <customer_name>Henry</customer_name>
+    <subject>Security incident detected</subject>
+    <description>Possible security issue, please investigate the access logs immediately.</description>
+    <tags>
+      <tag>security</tag>
+      <tag>urgent</tag>
+    </tags>
+    <metadata>
+      <source>email</source>
+      <browser>Edge</browser>
+      <device_type>desktop</device_type>
+    </metadata>
+  </ticket>
+  <ticket>
+    <customer_id>C-401</customer_id>
+    <customer_email>ivy@example.com</customer_email>
+    <customer_name>Ivy</customer_name>
+    <subject>Bug report with reproduce steps</subject>
+    <description>I can reproduce the bug consistently when clicking the submit button twice.</description>
+    <tags>
+      <tag>bug</tag>
+    </tags>
+    <metadata>
+      <source>web_form</source>
+    </metadata>
+  </ticket>
+</tickets>

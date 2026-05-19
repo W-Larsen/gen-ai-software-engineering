@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tickets>
+  <ticket>
+    <customer_id>C-301</customer_id>
+    <customer_email>rachel@initech.com</customer_email>
+    <customer_name>Rachel Green</customer_name>
+    <subject>Production down — urgent help needed</subject>
+    <description>Our production environment is completely down. All users are affected. This is a critical outage and we need immediate assistance.</description>
+    <tags>
+      <tag>outage</tag>
+      <tag>critical</tag>
+    </tags>
+    <metadata>
+      <source>phone</source>
+    </metadata>
+  </ticket>
+  <ticket>
+    <customer_id>C-302</customer_id>
+    <customer_email>sam@initech.com</customer_email>
+    <customer_name>Sam Rivers</customer_name>
+    <subject>Invoice question about subscription</subject>
+    <description>I have a billing question about my subscription renewal. The invoice amount differs from what was quoted. Please clarify the charge.</description>
+    <tags>
+      <tag>billing</tag>
+      <tag>invoice</tag>
+    </tags>
+    <metadata>
+      <source>email</source>
+      <browser>Chrome</browser>
+      <device_type>desktop</device_type>
+    </metadata>
+  </ticket>
+  <ticket>
+    <customer_id>C-303</customer_id>
+    <customer_email>tom@initech.com</customer_email>
+    <customer_name>Tom Baker</customer_name>
+    <subject>Login with SSO broken</subject>
+    <description>Single sign-on login stopped working after your last update. Our entire team cannot log in. This is blocking all work immediately.</description>
+    <tags>
+      <tag>sso</tag>
+      <tag>login</tag>
+      <tag>blocking</tag>
+    </tags>
+    <metadata>
+      <source>api</source>
+    </metadata>
+  </ticket>
+  <ticket>
+    <customer_id>C-304</customer_id>
+    <customer_email>uma@initech.com</customer_email>
+    <customer_name>Uma Thurston</customer_name>
+    <subject>Minor cosmetic issue on dashboard</subject>
+    <description>Small cosmetic alignment issue on the main dashboard. The sidebar icons are slightly off-centre. Minor visual suggestion only.</description>
+    <tags>
+      <tag>ui</tag>
+      <tag>cosmetic</tag>
+    </tags>
+    <metadata>
+      <source>web_form</source>
+      <browser>Safari</browser>
+      <device_type>tablet</device_type>
+    </metadata>
+  </ticket>
+  <ticket>
+    <customer_id>C-305</customer_id>
+    <customer_email>vera@initech.com</customer_email>
+    <customer_name>Vera Long</customer_name>
+    <subject>Bug: form submission fails with exception</subject>
+    <description>Defect found in the contact form. Steps to reproduce: 1. Fill all fields 2. Click Submit 3. Exception thrown. Regression from v2.3.</description>
+    <tags>
+      <tag>bug</tag>
+      <tag>regression</tag>
+    </tags>
+    <metadata>
+      <source>web_form</source>
+      <browser>Firefox</browser>
+      <device_type>desktop</device_type>
+    </metadata>
+  </ticket>
+</tickets>

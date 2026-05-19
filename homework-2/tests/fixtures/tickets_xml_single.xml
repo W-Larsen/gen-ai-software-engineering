@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tickets>
+  <ticket>
+    <customer_id>C-500</customer_id>
+    <customer_email>jack@example.com</customer_email>
+    <customer_name>Jack</customer_name>
+    <subject>Only ticket</subject>
+    <description>This file contains a single ticket element to test array normalization.</description>
+    <metadata>
+      <source>phone</source>
+    </metadata>
+  </ticket>
+</tickets>

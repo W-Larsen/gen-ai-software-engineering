@@ -1,0 +1,2 @@
+customer_id,customer_email,customer_name,subject,description,metadata.source
+C-700,"unterminated@example.com,Bad,Subject,Description without closing quote,web_form

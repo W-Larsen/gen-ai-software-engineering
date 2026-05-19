@@ -1,0 +1,4 @@
+customer_id,customer_email,customer_name,subject,description,category,priority,status,tags,metadata.source,metadata.browser,metadata.device_type
+C-100,bob@example.com,Bob,Cannot login,I cannot access my account please help me reset the password,account_access,urgent,new,"login,urgent",web_form,Chrome,desktop
+C-101,carol@example.com,Carol,Refund needed,I would like a refund for the last invoice please assist soon,billing_question,medium,new,"refund,billing",email,Firefox,mobile
+C-102,dave@example.com,Dave,App crashes,The application crashes on startup with a stack trace every time,technical_issue,high,new,"crash,technical",api,Safari,tablet
