@@ -1,0 +1,11 @@
+customer_id,customer_email,customer_name,subject,description,category,priority,status,tags,metadata.source,metadata.browser,metadata.device_type
+C-101,alice@acme.com,Alice Johnson,Cannot access my account,I can't access my account since this morning. Password reset emails are not arriving either.,account_access,urgent,new,"login,password",web_form,Chrome,desktop
+C-102,bob@acme.com,Bob Smith,Billing invoice incorrect,My latest invoice shows a charge I did not authorise. Please refund the extra payment.,billing_question,high,new,"billing,refund",email,Firefox,mobile
+C-103,carol@acme.com,Carol White,App crashes on startup,The application crashes every time I open it. Stack trace: TypeError at index.js:42.,technical_issue,high,new,"crash,bug",api,,
+C-104,dave@acme.com,Dave Brown,Please add dark mode,Would love a dark mode option for the dashboard. Minor cosmetic suggestion.,feature_request,low,new,"feature,ui",web_form,Safari,tablet
+C-105,erin@acme.com,Erin Davis,Steps to reproduce login bug,Bug: after entering correct password the session expires immediately. Steps to reproduce: 1. Login 2. Wait 5s.,bug_report,medium,new,"bug,session",chat,Edge,desktop
+C-106,frank@acme.com,Frank Lee,Payment failed,My payment for the subscription was blocked. Important: I need access to billing immediately.,billing_question,high,new,"payment,subscription",phone,,
+C-107,grace@acme.com,Grace Kim,Two-factor auth not working,The 2FA code from my authenticator app is not accepted. Cannot log in since 2 hours.,account_access,urgent,new,"2fa,mfa,login",web_form,Chrome,mobile
+C-108,henry@acme.com,Henry Wilson,Page loads slowly,The main dashboard takes 30 seconds to load. Timeout errors appear in the console.,technical_issue,medium,new,"performance,timeout",email,Firefox,desktop
+C-109,iris@acme.com,Iris Martinez,Export feature request,Please add CSV export to the reports page. Would love this enhancement for our team.,feature_request,low,new,"export,enhancement"],web_form,Chrome,desktop
+C-110,jack@acme.com,Jack Taylor,Production down,Production down for all users. Critical outage started at 14:00 UTC. Security alert also triggered.,technical_issue,urgent,new,"outage,critical"],api,,

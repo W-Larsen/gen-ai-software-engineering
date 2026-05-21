@@ -1,0 +1,3 @@
+customer_id,customer_email,customer_name,subject,description,metadata.source
+C-900,bad-email,Oscar,Subject one,This description is long enough for validation rules.,web_form
+C-901,peter@example.com,Peter,Subject two,This description is long enough for validation rules.,web_form

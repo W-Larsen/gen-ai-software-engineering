@@ -1,0 +1,19 @@
+[
+  {
+    "customer_id": "C-200",
+    "customer_email": "erin@example.com",
+    "customer_name": "Erin",
+    "subject": "Production down",
+    "description": "Production down right now, need urgent assistance please.",
+    "metadata": { "source": "api" }
+  },
+  {
+    "customer_id": "C-201",
+    "customer_email": "frank@example.com",
+    "customer_name": "Frank",
+    "subject": "Feature request please add export",
+    "description": "Please add a CSV export feature, would love this enhancement.",
+    "tags": ["enhancement"],
+    "metadata": { "source": "web_form" }
+  }
+]

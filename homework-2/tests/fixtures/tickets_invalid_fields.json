@@ -1,0 +1,18 @@
+[
+  {
+    "customer_id": "C-600",
+    "customer_email": "not-an-email",
+    "customer_name": "Mallory",
+    "subject": "Bad email",
+    "description": "Description that is more than ten characters long.",
+    "metadata": { "source": "web_form" }
+  },
+  {
+    "customer_id": "C-601",
+    "customer_email": "good@example.com",
+    "customer_name": "Nina",
+    "subject": "Valid one",
+    "description": "Description that is more than ten characters long.",
+    "metadata": { "source": "web_form" }
+  }
+]

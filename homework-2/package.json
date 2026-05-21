@@ -1,0 +1,37 @@
+{
+  "name": "homework-2-ticket-support",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Intelligent customer support ticket system (Homework 2)",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:coverage": "jest --coverage"
+  },
+  "dependencies": {
+    "csv-parse": "^5.5.6",
+    "express": "^4.19.2",
+    "fast-xml-parser": "^4.4.1",
+    "multer": "^1.4.5-lts.1",
+    "uuid": "^9.0.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.12",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^20.14.10",
+    "@types/supertest": "^6.0.2",
+    "@types/uuid": "^9.0.8",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.2",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.3"
+  }
+}
