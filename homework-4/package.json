@@ -1,0 +1,16 @@
+{
+  "name": "ledger-cli",
+  "version": "1.0.0",
+  "description": "Tiny zero-dependency Node.js CLI 'ledger' used as the sample application the 4-agent pipeline operates on. Ships with seeded bugs and one security issue (the 'before' state).",
+  "main": "src/index.js",
+  "bin": {
+    "ledger": "src/index.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/index.js",
+    "pipeline": "./run-pipeline.sh"
+  },
+  "author": "Valentyn Korniienko",
+  "license": "MIT"
+}
