@@ -59,7 +59,7 @@ git push origin homework-1-submission
 
 ### 2️⃣ Create a Pull Request
 
-> **Pull request quality:** Do not submit a bare or one-line PR. Prepare a **detailed pull request** with a full description of what you implemented, how you used AI, how reviewers can run and verify your work, and **screenshots** (or other demos) where the homework asks for evidence. Homework submitted **without a proper PR description** and the expected visual documentation **will be rejected**. Treat the PR body as the primary submission narrative—link to `README.md` / `HOWTORUN.md` in the repo, but the PR itself must still stand on its own.
+> **Pull request quality:** Do not submit a bare or one-line PR. Prepare a **detailed pull request** with a full description of what you implemented, how you used AI, how reviewers can run and verify your work, and 3-5 **screenshots** (or other demos) where the homework asks for evidence. Homework submitted **without a proper PR description** and the expected visual documentation **will be rejected**. Treat the PR body as the primary submission narrative—link to `README.md` / `HOWTORUN.md` in the repo, but the PR itself must still stand on its own.
 
 1. Go to your forked repository on GitHub. *Do not create pull requests into original repository*
 2. Click **"Compare & pull request"** or go to **Pull requests** → **New pull request**

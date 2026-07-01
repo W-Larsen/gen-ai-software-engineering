@@ -2,7 +2,7 @@
 
 ## 📋 Overview
 
-Build a customer support ticket management system that imports tickets from multiple file formats, automatically categorizes issues, and assigns priorities. Focus on applying the **Context-Model-Prompt** while generating comprehensive tests and documentation using AI tools.
+Build a customer support ticket management system that imports tickets from multiple file formats, automatically categorizes issues, and assigns priorities. Implement a web front-end for agents to manage tickets day to day. Focus on applying the **Context-Model-Prompt** while generating comprehensive tests and documentation using AI tools.
 
 ---
 
@@ -11,6 +11,7 @@ Build a customer support ticket management system that imports tickets from mult
 - ✅ Master the **Context-Model-Prompt framework** in practice
 - ✅ Generate comprehensive test suites with AI (>85% coverage)
 - ✅ Create multi-level documentation
+- ✅ Build a functional front-end that consumes the ticket API
 
 ---
 
@@ -18,7 +19,9 @@ Build a customer support ticket management system that imports tickets from mult
 
 **Tools:** Use AI coding tools
 
-**Tech Stack:** Choose one - Node.js/Express, Python/Flask/FastAPI, or Java/Spring Boot
+**Backend Tech Stack:** Choose one - Node.js/Express, Python/Flask/FastAPI, or Java/Spring Boot
+
+**Front-End Tech Stack:** Your choice (e.g., React, Vue, Svelte, plain HTML/CSS/JS)
 
 ---
 
@@ -165,7 +168,28 @@ Generate 5 documentation files for different audiences:
 
 ---
 
-### Task 5: Integration & Performance Tests
+### Task 5: Front-End Application
+
+Build a web UI for the customer support ticket management system.
+
+**Tech stack:** Your choice — pick any framework or library you prefer (React, Vue, Angular, Svelte, etc.) or use plain HTML/CSS/JavaScript.
+
+**Required UI features:**
+- List tickets with filtering by category, priority, and status
+- Create and edit tickets via forms with client-side validation
+- View ticket details (including classification results and metadata)
+- Bulk import tickets from CSV/JSON/XML files
+- Trigger auto-classification for a ticket and display the result (category, priority, confidence, reasoning)
+- Clear error and success feedback for API operations
+
+**Requirements:**
+- Connect to the REST API from Tasks 1–2 (no hardcoded ticket data in the UI)
+- Responsive layout that works on desktop and mobile
+- Include setup/run instructions in the project README
+
+---
+
+### Task 6: Integration & Performance Tests
 
 Implement end-to-end tests.
 
@@ -185,7 +209,11 @@ Implement end-to-end tests.
 - Coverage report showing >85%
 - Screenshot in `docs/screenshots/test_coverage.png`
 
-### 3️⃣ Sample Data
+### 3️⃣ UI Screenshot
+- Screenshot of the running front-end in `docs/screenshots/ui.png`
+- Show the main ticket list or another representative screen with real data
+
+### 4️⃣ Sample Data
 - `sample_tickets.csv` (50 tickets)
 - `sample_tickets.json` (20 tickets)
 - `sample_tickets.xml` (30 tickets)
