@@ -1,0 +1,14 @@
+[project]
+name = "lorem-ipsum-mcp-server"
+version = "0.1.0"
+description = "Custom MCP server (FastMCP) that serves word-limited text from lorem-ipsum.md"
+readme = "README.md"
+# pydantic (a FastMCP dependency) does not yet support the Python 3.14
+# release candidate, so pin to a stable 3.12/3.13 interpreter.
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "fastmcp>=2.0.0",
+]
+
+[project.scripts]
+lorem-ipsum-mcp-server = "server:mcp.run"

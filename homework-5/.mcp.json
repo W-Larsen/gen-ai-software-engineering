@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "lorem-ipsum": {
+      "command": "D:/WD-1TB-OLD-J/Cources/SET University/Gen AI and Agentic AI/Homeworks/gen-ai-software-engineering/homework-5/custom-mcp-server/.venv/Scripts/python.exe",
+      "args": [
+        "D:/WD-1TB-OLD-J/Cources/SET University/Gen AI and Agentic AI/Homeworks/gen-ai-software-engineering/homework-5/custom-mcp-server/server.py"
+      ]
+    }
+  }
+}
