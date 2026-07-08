@@ -1,9 +1,9 @@
 ---
+name: write-spec
 description: Generate homework-6/specification.md for the banking transaction-processing pipeline from the bundled template
-argument-hint: [feature/scope, e.g. "core validator + fraud + settlement pipeline"]
 ---
 
-# /write-spec — Generate the pipeline specification
+# Generate the pipeline specification
 
 Author `homework-6/specification.md` for the banking transaction-processing pipeline (Task 1 / Agent 1), following the bundled template and the structure mandated in `TASKS.md`. **Write a specification only — no implementation code.**
 
