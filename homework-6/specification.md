@@ -49,7 +49,11 @@ third-party provider.
   reflects each transaction's current lifecycle stage within the read-after-write consistency
   target defined in Performance Targets.
   *Verification: an isolated-filesystem integration test asserting 8/8 terminal outcomes and a
-  second run proving idempotency; manual UI walkthrough of the lifecycle timeline.*
+  second run proving idempotency; manual UI walkthrough of the lifecycle timeline; `demo.sh`
+  automates the same walkthrough end-to-end (dependency provisioning, dry-run, full pipeline run,
+  coverage-gated test suite, in-process MCP tool calls, and a live frontend submission with a
+  polled per-transaction status table) so M5 is demonstrable in one command with zero manual
+  steps.*
 
 ## Implementation Notes
 
@@ -113,6 +117,10 @@ third-party provider.
   **≥ 90%** statement coverage (the coverage-gate hook in Task 3 blocks push below 80%).
 - The frontend is reachable (e.g. `uvicorn frontend.server:app`) and shows each of the 8 sample
   transactions moving through input → processing → validated → scored → compliance → results.
+- `demo.sh` exists at the `homework-6/` root and, from a clean checkout, provisions a local
+  `.venv`, installs dependencies, and drives every step above (validator dry-run, full pipeline
+  run, coverage-gated test suite, in-process MCP tool calls, and a live frontend submission watched
+  via `/api/status`) to completion with no manual intervention.
 
 ## Low-Level Tasks
 
@@ -334,7 +342,11 @@ Acceptance Criteria:
   `transaction_id`s appear exactly once in `shared/results/`; re-invokes `run_pipeline` a second
   time and asserts zero new/changed result files (idempotency); asserts `summary.json` counts sum
   to 8. A manual QA pass starts the frontend, calls `/submit`, and visually confirms the lifecycle
-  timeline advances for each transaction to a terminal state.
+  timeline advances for each transaction to a terminal state. `demo.sh` (see `HOWTORUN.md` §0)
+  performs this same walkthrough non-interactively — clean-slating `shared/`, submitting the 8
+  sample transactions plus 2 randomly generated ones via `/clear` + `/submit` + `/random`, and
+  polling `/api/status` until every transaction reaches the `results` stage — as a reproducible,
+  zero-manual-steps substitute for the manual QA pass.
 - **Coverage.** `pytest --cov=agents --cov=frontend --cov=integrator` must report **≥ 90%**
   statement coverage; the Task 3 coverage-gate hook independently blocks any push below 80%.
 

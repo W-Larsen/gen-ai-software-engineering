@@ -8,8 +8,17 @@ file-based, multi-agent banking transaction-processing pipeline from scratch, pe
 [`TASKS.md`](TASKS.md) and [`specification.md`](specification.md).
 
 To see the whole system run end-to-end in one command — dependencies, pipeline, tests, MCP tools,
-and the live dashboard — run `bash demo.sh` from this directory. It needs only Python 3.11+ and
-`curl`; see [`HOWTORUN.md`](HOWTORUN.md) for the flags and for the manual equivalent of each step.
+and the live dashboard — run `bash demo.sh` from this directory (macOS/Linux/Git Bash). It needs
+only Python 3.11+ and `curl`; see [`HOWTORUN.md`](HOWTORUN.md) for the flags and for the manual
+equivalent of each step.
+
+**Windows PowerShell**: plain `bash` on `PATH` may resolve to the WSL launcher stub
+(`C:\Windows\System32\bash.exe`) instead of Git Bash, which fails if no WSL distro is installed.
+Invoke Git Bash explicitly with `--login` so its profile puts `dirname`/`sed`/coreutils on `PATH`:
+
+```powershell
+& "C:\Program Files\Git\usr\bin\bash.exe" --login demo.sh
+```
 
 ## What the system does
 

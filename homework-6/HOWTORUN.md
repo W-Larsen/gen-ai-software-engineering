@@ -13,6 +13,18 @@ Python 3.11+ and `curl`, and performs every step in this document with no manual
 bash demo.sh
 ```
 
+**Windows PowerShell users**: plain `bash` on `PATH` can resolve to the WSL launcher stub
+(`C:\Windows\System32\bash.exe`) rather than Git Bash, which fails immediately if no WSL distro is
+installed (`CreateProcessCommon:818: execvpe(/bin/bash) failed`). Invoke Git Bash's own `bash.exe`
+by full path with `--login` so its profile puts coreutils (`dirname`, `sed`, ...) on `PATH`:
+
+```powershell
+& "C:\Program Files\Git\usr\bin\bash.exe" --login demo.sh
+```
+
+(Adjust the path if Git for Windows is installed elsewhere. Opening a **Git Bash** terminal window
+directly and running `./demo.sh` from there works too, since that shortcut already logs in.)
+
 It creates a local `.venv` (first run only), installs the dependencies, wipes `shared/` and
 `logs/audit.log` for a clean slate, runs the validator dry-run, runs the full pipeline, runs the
 test suite against the 80% coverage gate, calls the custom MCP tools in-process, then starts the
