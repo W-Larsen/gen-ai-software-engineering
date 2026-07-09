@@ -22,7 +22,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-# .../homework-6/.claude/hooks/coverage_gate.py -> parents[2] == homework-6/
 PROJECT_DIR = Path(__file__).resolve().parents[2]
 COVERAGE_THRESHOLD = 80
 
