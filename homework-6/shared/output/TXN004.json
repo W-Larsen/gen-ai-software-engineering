@@ -1,0 +1,28 @@
+{
+  "data": {
+    "amount": "500.00",
+    "currency": "EUR",
+    "description": "Invoice #4471",
+    "destination_account": "ACC-5500",
+    "fraud_review": false,
+    "fraud_signals": [
+      "off_hours",
+      "cross_border"
+    ],
+    "metadata": {
+      "channel": "api",
+      "country": "DE"
+    },
+    "risk_score": 35,
+    "source_account": "ACC-1004",
+    "status": "scored",
+    "timestamp": "2026-03-16T02:47:00Z",
+    "transaction_id": "TXN004",
+    "transaction_type": "transfer"
+  },
+  "message_id": "14acd4d7-5a74-435c-bb23-abdb0bc3ed16",
+  "message_type": "transaction",
+  "source_agent": "fraud_detector",
+  "target_agent": "compliance_checker",
+  "timestamp": "2026-07-09T13:29:48Z"
+}

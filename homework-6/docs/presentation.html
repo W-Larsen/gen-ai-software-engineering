@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Pipelines — Banking Transaction Processing</title>
+<style>
+  :root{
+    --bg:#0a0e1a; --bg2:#0f1524; --panel:#141b2e; --panel2:#1a2338;
+    --line:#26314d; --text:#e6ecf7; --muted:#8b97b4; --dim:#5c6785;
+    --spec:#3b82f6; --codegen:#a855f7; --test:#eab308; --docs:#22c55e;
+    --validator:#22c55e; --fraud:#f97316; --compliance:#ef4444; --frontend:#06b6d4;
+    --accent:#7c9cff;
+    --mono:'SF Mono',ui-monospace,'Cascadia Code','Fira Code',Consolas,monospace;
+    --sans:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:radial-gradient(1200px 800px at 78% -10%,#16203a 0%,var(--bg) 55%);
+    color:var(--text); font-family:var(--sans); overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- deck / slides ---------- */
+  .deck{position:fixed;inset:0}
+  .slide{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    justify-content:center;padding:5vh 7vw;opacity:0;pointer-events:none;
+    transform:translateY(24px) scale(.99);
+    transition:opacity .5s ease,transform .5s cubic-bezier(.2,.7,.2,1);
+  }
+  .slide.active{opacity:1;pointer-events:auto;transform:none}
+  .slide.active .reveal{animation:rise .6s both}
+  .slide.active .reveal:nth-child(2){animation-delay:.06s}
+  .slide.active .reveal:nth-child(3){animation-delay:.12s}
+  .slide.active .reveal:nth-child(4){animation-delay:.18s}
+  .slide.active .reveal:nth-child(5){animation-delay:.24s}
+  @keyframes rise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+
+  .kicker{font-family:var(--mono);font-size:.78rem;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--accent);margin-bottom:1.1rem}
+  h1{font-size:clamp(2.2rem,5.4vw,4.4rem);line-height:1.02;letter-spacing:-.02em;font-weight:800}
+  h2{font-size:clamp(1.6rem,3.4vw,2.8rem);line-height:1.08;letter-spacing:-.02em;font-weight:750;margin-bottom:.4rem}
+  .sub{color:var(--muted);font-size:clamp(1rem,1.5vw,1.28rem);max-width:60ch;line-height:1.55;margin-top:1rem}
+  .lead{color:var(--muted);font-size:1.02rem;line-height:1.6;max-width:70ch}
+  .grad{background:linear-gradient(100deg,#7c9cff,#a855f7 45%,#06b6d4);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+
+  /* ---------- chrome ---------- */
+  .topbar{position:fixed;top:0;left:0;right:0;height:4px;background:var(--line);z-index:40}
+  .topbar .fill{height:100%;background:linear-gradient(90deg,var(--spec),var(--codegen),var(--frontend));
+    width:0;transition:width .5s ease}
+  .hud{position:fixed;bottom:22px;left:0;right:0;display:flex;justify-content:center;
+    align-items:center;gap:16px;z-index:40}
+  .dots{display:flex;gap:9px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--line);cursor:pointer;
+    transition:transform .2s,background .2s}
+  .dot:hover{transform:scale(1.35)}
+  .dot.on{background:var(--accent);transform:scale(1.25)}
+  .nav{position:fixed;bottom:16px;right:22px;display:flex;gap:8px;z-index:40}
+  .nav button{width:40px;height:40px;border-radius:11px;border:1px solid var(--line);
+    background:var(--panel);color:var(--text);font-size:1.1rem;cursor:pointer;
+    display:grid;place-items:center;transition:.15s}
+  .nav button:hover{border-color:var(--accent);background:var(--panel2)}
+  .pagenum{position:fixed;bottom:24px;left:24px;font-family:var(--mono);font-size:.78rem;
+    color:var(--dim);z-index:40}
+  .hint{position:fixed;top:18px;right:22px;font-family:var(--mono);font-size:.68rem;
+    color:var(--dim);z-index:40;letter-spacing:.05em}
+
+  /* ---------- generic bits ---------- */
+  .row{display:flex;gap:22px;flex-wrap:wrap}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:center}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .card{background:linear-gradient(180deg,var(--panel),var(--bg2));
+    border:1px solid var(--line);border-radius:16px;padding:20px 22px}
+  .tag{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);
+    font-size:.72rem;padding:5px 11px;border-radius:999px;border:1px solid var(--line);
+    color:var(--muted);background:#0e1526}
+  .tag b{width:8px;height:8px;border-radius:50%;display:inline-block}
+  code,.mono{font-family:var(--mono)}
+  .chip{font-family:var(--mono);font-size:.74rem;color:var(--muted);
+    background:#0d1424;border:1px solid var(--line);padding:3px 8px;border-radius:7px}
+  ul.clean{list-style:none;display:flex;flex-direction:column;gap:.7rem}
+  ul.clean li{padding-left:1.4rem;position:relative;color:var(--muted);line-height:1.5}
+  ul.clean li::before{content:'▸';position:absolute;left:0;color:var(--accent)}
+  ul.clean li b{color:var(--text)}
+
+  /* ---------- pipeline node ---------- */
+  .pnode{position:relative;border-radius:14px;padding:16px 16px;border:1px solid var(--line);
+    background:linear-gradient(180deg,var(--panel),var(--bg2));min-width:0}
+  .pnode .n-top{display:flex;align-items:center;gap:9px;margin-bottom:6px}
+  .pnode .idx{font-family:var(--mono);font-size:.7rem;width:26px;height:26px;border-radius:8px;
+    display:grid;place-items:center;color:#0a0e1a;font-weight:800;flex:none}
+  .pnode .n-name{font-weight:700;font-size:.98rem;line-height:1.15}
+  .pnode .n-role{font-size:.78rem;color:var(--dim);font-family:var(--mono)}
+  .pnode .n-out{margin-top:9px;font-size:.74rem;color:var(--muted);font-family:var(--mono);
+    border-top:1px dashed var(--line);padding-top:8px}
+  .pnode .n-out span{color:var(--text)}
+
+  /* ---------- build-pipeline flow (slide 3) ---------- */
+  .flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;
+    align-items:stretch;gap:12px;margin-top:8px}
+  .arrow{display:grid;place-items:center;color:var(--dim);font-size:1.5rem;position:relative}
+  .arrow .pip{position:absolute;width:9px;height:9px;border-radius:50%;
+    background:var(--accent);box-shadow:0 0 12px var(--accent);
+    left:-4px;opacity:0}
+  .slide.active .arrow .pip{animation:pip 2.6s linear infinite}
+  .arrow:nth-of-type(4) .pip{animation-delay:.6s}
+  .arrow:nth-of-type(6) .pip{animation-delay:1.2s}
+  @keyframes pip{0%{left:-6px;opacity:0}15%{opacity:1}85%{opacity:1}100%{left:calc(100% - 2px);opacity:0}}
+  .artifact-strip{display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;gap:12px;margin-top:14px}
+  .artifact{grid-column:span 1;text-align:center;font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+  .artifact .f{display:inline-block;background:#0d1424;border:1px solid var(--line);
+    border-radius:8px;padding:6px 10px;color:var(--text)}
+
+  /* ---------- orchestrator fan-out (slide 5) ---------- */
+  .orch{display:grid;grid-template-columns:250px 1fr;gap:34px;align-items:center;margin-top:6px}
+  .orch-hub{border:1px solid var(--codegen);border-radius:16px;padding:20px;
+    background:radial-gradient(120px 120px at 50% 0%,rgba(168,85,247,.22),transparent),
+      linear-gradient(180deg,var(--panel),var(--bg2));position:relative}
+  .orch-hub::after{content:'';position:absolute;inset:-1px;border-radius:16px;
+    box-shadow:0 0 0 1px rgba(168,85,247,.35),0 0 40px rgba(168,85,247,.18);pointer-events:none}
+  .pulse{width:52px;height:52px;border-radius:14px;background:var(--codegen);
+    display:grid;place-items:center;font-weight:800;color:#0a0e1a;font-size:1.5rem;margin-bottom:12px}
+  .slide.active .pulse{animation:beat 2.2s ease-in-out infinite}
+  @keyframes beat{0%,100%{box-shadow:0 0 0 0 rgba(168,85,247,.5)}50%{box-shadow:0 0 0 14px rgba(168,85,247,0)}}
+  .subagents{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .sa{border:1px solid var(--line);border-radius:12px;padding:13px 15px;
+    background:var(--panel);position:relative;opacity:.35;transform:translateX(-10px);
+    transition:opacity .4s,transform .4s,border-color .4s}
+  .sa .sa-dot{width:9px;height:9px;border-radius:50%;position:absolute;top:15px;right:14px;background:var(--dim)}
+  .sa.spawning{opacity:1;transform:none}
+  .sa.spawning .sa-dot{animation:blink .8s infinite}
+  .sa.done{opacity:1;transform:none;border-color:var(--line)}
+  .sa.done .sa-dot{background:var(--docs);animation:none}
+  @keyframes blink{50%{opacity:.25}}
+  .sa .sa-name{font-weight:700;font-size:.9rem;margin-bottom:3px}
+  .sa .sa-file{font-family:var(--mono);font-size:.72rem;color:var(--muted)}
+  .sa .sa-status{font-family:var(--mono);font-size:.68rem;margin-top:7px;color:var(--dim)}
+  .conn{stroke:var(--line);stroke-width:2;fill:none}
+
+  /* ---------- runtime txn flow (slide 8) ---------- */
+  .track{position:relative;margin-top:20px;padding-top:92px}
+  .railwrap{position:absolute;left:10%;right:10%;top:40px;height:3px;z-index:1;border-radius:3px;
+    background:linear-gradient(90deg,var(--validator),var(--fraud),var(--compliance));opacity:.45}
+  .railwrap .node{position:absolute;top:50%;width:11px;height:11px;border-radius:50%;
+    transform:translate(-50%,-50%);background:var(--bg2);border:2px solid var(--line)}
+  .token{position:absolute;top:40px;left:10%;transform:translate(-50%,-50%);
+    width:80px;height:56px;border-radius:14px;z-index:4;
+    background:linear-gradient(180deg,#1c2540,#141b2e);
+    border:2px solid var(--accent);display:grid;place-items:center;gap:1px;
+    box-shadow:0 10px 26px rgba(0,0,0,.55),0 0 22px rgba(124,156,255,.35);
+    font-family:var(--mono);text-align:center;color:var(--text);cursor:pointer;
+    transition:left .9s cubic-bezier(.5,0,.2,1),border-color .4s}
+  .token .amt{font-weight:800;font-size:.72rem}
+  .token .st{color:var(--muted);font-size:.56rem}
+  .stages{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;position:relative;z-index:2}
+  .stage{text-align:center}
+  .stage .box{border:1px solid var(--line);border-radius:13px;padding:16px 8px;
+    background:linear-gradient(180deg,var(--panel),var(--bg2));transition:.3s}
+  .stage.hot .box{border-color:var(--sc,var(--accent));box-shadow:0 0 26px rgba(124,156,255,.22);transform:translateY(-4px)}
+  .stage .s-name{font-weight:700;font-size:.9rem}
+  .stage .s-sub{font-family:var(--mono);font-size:.68rem;color:var(--dim);margin-top:4px}
+  .verdict{margin-top:22px;text-align:center;font-family:var(--mono);font-size:.95rem;
+    min-height:1.4em;color:var(--muted);transition:color .3s}
+
+  /* ---------- protocol dirs (slide 9) ---------- */
+  .dirs{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:6px}
+  .dir{border:1px solid var(--line);border-radius:13px;padding:16px;background:var(--panel);position:relative;overflow:hidden}
+  .dir h4{font-family:var(--mono);font-size:.85rem;color:var(--frontend)}
+  .dir p{color:var(--muted);font-size:.82rem;margin-top:6px;line-height:1.45}
+  .dir .glow{position:absolute;inset:0;background:radial-gradient(80px 60px at 50% 0,rgba(6,182,212,.14),transparent)}
+  .env{margin-top:16px;background:#0b1120;border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;font-family:var(--mono);font-size:.8rem;line-height:1.6;overflow:auto}
+  .env .k{color:var(--frontend)} .env .v{color:#c9d4ee} .env .c{color:var(--dim)}
+
+  /* ---------- tech table (slide 10) ---------- */
+  table{width:100%;border-collapse:collapse;font-size:.86rem;margin-top:8px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+  th{color:var(--dim);font-family:var(--mono);font-size:.72rem;text-transform:uppercase;letter-spacing:.08em}
+  td b{color:var(--text)} td{color:var(--muted)}
+  tr:hover td{background:rgba(124,156,255,.04)}
+
+  .two-col{display:grid;grid-template-columns:1.1fr .9fr;gap:34px;align-items:start}
+  .metrics{display:flex;gap:26px;flex-wrap:wrap;margin-top:8px}
+  .metric .big{font-size:2.4rem;font-weight:800;line-height:1}
+  .metric .lbl{font-family:var(--mono);font-size:.72rem;color:var(--dim);margin-top:4px}
+
+  @media (max-width:820px){
+    .grid2,.two-col,.orch{grid-template-columns:1fr}
+    .flow,.artifact-strip{grid-template-columns:1fr;gap:8px}
+    .arrow{transform:rotate(90deg)}
+    .grid3,.dirs,.subagents{grid-template-columns:1fr 1fr}
+    .stages{grid-template-columns:repeat(5,1fr)}
+  }
+</style>
+</head>
+<body>
+<div class="topbar"><div class="fill" id="fill"></div></div>
+<div class="hint">← / → or Space · press F for fullscreen</div>
+
+<div class="deck" id="deck">
+
+  <!-- 1 · TITLE -->
+  <section class="slide">
+    <div class="reveal kicker">SET University · Gen AI &amp; Agentic AI · Homework 6</div>
+    <h1 class="reveal">Agent Pipelines<br><span class="grad">that build &amp; run software</span></h1>
+    <p class="reveal sub">A file-based, multi-agent <b style="color:var(--text)">banking transaction-processing pipeline</b> —
+      written end-to-end by a pipeline of Claude Code meta-agents, then executing its own runtime pipeline of cooperating agents.</p>
+    <div class="reveal row" style="margin-top:2rem">
+      <span class="tag"><b style="background:var(--spec)"></b> Spec-driven</span>
+      <span class="tag"><b style="background:var(--codegen)"></b> Orchestrated code-gen</span>
+      <span class="tag"><b style="background:var(--test)"></b> Coverage-gated</span>
+      <span class="tag"><b style="background:var(--frontend)"></b> Live lifecycle UI</span>
+    </div>
+    <p class="reveal lead" style="margin-top:2.2rem;color:var(--dim)">Presented by <b style="color:var(--text)">Valentyn Korniienko</b></p>
+  </section>
+
+  <!-- 2 · TWO PIPELINES -->
+  <section class="slide">
+    <div class="reveal kicker">The big picture</div>
+    <h2 class="reveal">Two pipelines, one repository</h2>
+    <p class="reveal lead">One pipeline <b>writes</b> the software; the other <b>runs</b> inside it. Both are agentic.</p>
+    <div class="reveal grid2" style="margin-top:1.8rem">
+      <div class="card" style="border-color:rgba(168,85,247,.4)">
+        <div class="tag" style="margin-bottom:12px"><b style="background:var(--codegen)"></b> Build time</div>
+        <h3 style="font-size:1.15rem;margin-bottom:.5rem">Meta-agent pipeline</h3>
+        <p class="lead" style="font-size:.92rem">Four Claude Code agents — <b>specification → code-generation → tests → docs</b> —
+          each consuming the previous one's artifact. The code-generator is itself an <b>orchestrator</b> that spawns nested subagents.</p>
+        <div class="row" style="margin-top:12px">
+          <span class="chip">specification.md</span><span class="chip">agents/*.py</span><span class="chip">tests/</span><span class="chip">README.md</span>
+        </div>
+      </div>
+      <div class="card" style="border-color:rgba(6,182,212,.4)">
+        <div class="tag" style="margin-bottom:12px"><b style="background:var(--frontend)"></b> Run time</div>
+        <h3 style="font-size:1.15rem;margin-bottom:.5rem">Banking pipeline</h3>
+        <p class="lead" style="font-size:.92rem">Three cooperating agents — <b>Validator → Fraud Detector → Compliance Checker</b> —
+          pass JSON messages through <code>shared/</code> folders. A FastAPI UI and a FastMCP server observe the same data.</p>
+        <div class="row" style="margin-top:12px">
+          <span class="chip">shared/input</span><span class="chip">processing</span><span class="chip">output</span><span class="chip">results</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · BUILD PIPELINE FLOW -->
+  <section class="slide">
+    <div class="reveal kicker">Pipeline #1 · build time</div>
+    <h2 class="reveal">The meta-agent build pipeline</h2>
+    <p class="reveal lead">Each agent's output is the next agent's input contract. Watch the artifact flow left to right.</p>
+
+    <div class="reveal flow" style="margin-top:1.6rem">
+      <div class="pnode">
+        <div class="n-top"><span class="idx" style="background:var(--spec)">1</span>
+          <div><div class="n-name">specification-writer</div><div class="n-role">model: sonnet</div></div></div>
+        <div class="n-out">reads TASKS.md → writes<br><span>specification.md</span></div>
+      </div>
+      <div class="arrow">➜<span class="pip"></span></div>
+      <div class="pnode">
+        <div class="n-top"><span class="idx" style="background:var(--codegen)">2</span>
+          <div><div class="n-name">code-generator</div><div class="n-role">orchestrator · opus</div></div></div>
+        <div class="n-out">reads spec → spawns<br><span>4 nested subagents</span></div>
+      </div>
+      <div class="arrow">➜<span class="pip"></span></div>
+      <div class="pnode">
+        <div class="n-top"><span class="idx" style="background:var(--test)">3</span>
+          <div><div class="n-name">unit-test-agent</div><div class="n-role">model: sonnet</div></div></div>
+        <div class="n-out">reads code → writes<br><span>tests/ · ≥80% gate</span></div>
+      </div>
+      <div class="arrow">➜<span class="pip"></span></div>
+      <div class="pnode">
+        <div class="n-top"><span class="idx" style="background:var(--docs)">4</span>
+          <div><div class="n-name">documentation-agent</div><div class="n-role">model: sonnet</div></div></div>
+        <div class="n-out">reads sources → writes<br><span>README · HOWTORUN</span></div>
+      </div>
+    </div>
+
+    <div class="reveal artifact-strip">
+      <div class="artifact"><span class="f">TASKS.md</span></div>
+      <div></div>
+      <div class="artifact"><span class="f">specification.md</span></div>
+      <div></div>
+      <div class="artifact"><span class="f">working code</span></div>
+      <div></div>
+      <div class="artifact"><span class="f">tested + documented</span></div>
+    </div>
+  </section>
+
+  <!-- 4 · AGENT 1 SPEC -->
+  <section class="slide">
+    <div class="reveal kicker" style="color:var(--spec)">Agent 1 of 4</div>
+    <h2 class="reveal">specification-writer <span style="color:var(--spec)">→ the contract</span></h2>
+    <div class="reveal two-col" style="margin-top:1.4rem">
+      <div>
+        <p class="lead">Turns broad seed requirements into a <b>layered, traceable, execute-without-guessing</b> spec.
+          Its <b>Low-Level Tasks</b> section is literally the routing table the orchestrator reads next.</p>
+        <ul class="clean" style="margin-top:1.2rem">
+          <li>Reads <code>TASKS.md</code> + <code>sample-transactions.json</code> (8 rows of deliberate edge cases)</li>
+          <li>Emits <b>High → Mid → Low</b> level objectives, every low-level task traceable to a mid-level one</li>
+          <li>One low-level task <b>per pipeline agent</b> — validator, fraud, compliance, integrator, frontend</li>
+          <li>Writes <b>specification only</b> — never a line of implementation code</li>
+        </ul>
+      </div>
+      <div class="card" style="font-family:var(--mono);font-size:.82rem;line-height:1.7">
+        <div style="color:var(--dim)"># specification.md</div>
+        <div><span style="color:var(--spec)">High-Level</span> Objective</div>
+        <div style="padding-left:1rem;color:var(--muted)">└ file-based banking pipeline</div>
+        <div><span style="color:var(--spec)">Mid-Level</span> Objectives</div>
+        <div style="padding-left:1rem;color:var(--muted)">├ M1 validate · M2 score · M3 comply …</div>
+        <div><span style="color:var(--spec)">Low-Level</span> Tasks</div>
+        <div style="padding-left:1rem;color:var(--muted)">├ Transaction Validator → signature</div>
+        <div style="padding-left:1rem;color:var(--muted)">├ Fraud Detector → signature</div>
+        <div style="padding-left:1rem;color:var(--muted)">├ Compliance Checker → signature</div>
+        <div style="padding-left:1rem;color:var(--muted)">└ Frontend / Web UI → signature</div>
+        <div style="margin-top:8px;color:var(--dim)"># edge cases · verification · perf</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · AGENT 2 ORCHESTRATOR (centerpiece) -->
+  <section class="slide" id="slideOrch">
+    <div class="reveal kicker" style="color:var(--codegen)">Agent 2 of 4 · the centerpiece</div>
+    <h2 class="reveal">code-generator <span style="color:var(--codegen)">orchestrates nested subagents</span></h2>
+    <p class="reveal lead">It builds the shared glue itself, then delegates each Low-Level Task to a dedicated subagent —
+      <b>one at a time</b>, verifying each before the next.</p>
+
+    <div class="reveal orch">
+      <div class="orch-hub">
+        <div class="pulse">2</div>
+        <div style="font-weight:750;font-size:1rem">code-generator</div>
+        <div class="n-role" style="color:var(--codegen)">orchestrator</div>
+        <div class="n-out" style="margin-top:12px;border-color:rgba(168,85,247,.3)">
+          Builds itself:<br>
+          <span style="color:var(--text)">agents/protocol.py</span><br>
+          <span style="color:var(--text)">integrator.py</span><br>
+          <span style="color:var(--text)">shared/ tree</span>
+        </div>
+      </div>
+
+      <div class="subagents" id="subagents">
+        <div class="sa" data-c="var(--validator)"><span class="sa-dot"></span>
+          <div class="sa-name" style="color:var(--validator)">transaction-validator</div>
+          <div class="sa-file">agents/transaction_validator.py</div>
+          <div class="sa-status">idle</div></div>
+        <div class="sa" data-c="var(--fraud)"><span class="sa-dot"></span>
+          <div class="sa-name" style="color:var(--fraud)">fraud-detector</div>
+          <div class="sa-file">agents/fraud_detector.py</div>
+          <div class="sa-status">idle</div></div>
+        <div class="sa" data-c="var(--compliance)"><span class="sa-dot"></span>
+          <div class="sa-name" style="color:var(--compliance)">compliance-agent</div>
+          <div class="sa-file">agents/compliance_checker.py</div>
+          <div class="sa-status">idle</div></div>
+        <div class="sa" data-c="var(--frontend)"><span class="sa-dot"></span>
+          <div class="sa-name" style="color:var(--frontend)">frontend-agent</div>
+          <div class="sa-file">frontend/server.py + static</div>
+          <div class="sa-status">idle</div></div>
+      </div>
+    </div>
+    <p class="reveal lead" style="margin-top:1.4rem;font-size:.86rem;color:var(--dim)">
+      Every subagent must use <b>context7</b> for framework lookups and log ≥2 queries to <code>research-notes.md</code>.
+      Order matters: validator &amp; fraud before compliance (data-flow); frontend last.</p>
+  </section>
+
+  <!-- 6 · AGENT 3 TESTS -->
+  <section class="slide">
+    <div class="reveal kicker" style="color:var(--test)">Agent 3 of 4</div>
+    <h2 class="reveal">unit-test-agent <span style="color:var(--test)">→ the safety net</span></h2>
+    <div class="reveal two-col" style="margin-top:1.4rem">
+      <div>
+        <p class="lead">Authors the <code>pytest</code> suite covering every agent plus a full-pipeline integration
+          test through <code>integrator.py</code> — and must clear the <b>mandatory ≥80% coverage gate</b>.</p>
+        <ul class="clean" style="margin-top:1.2rem">
+          <li>One test module per agent + <code>test_integrator.py</code> end-to-end</li>
+          <li>Isolates from real <code>shared/</code> &amp; <code>logs/</code> via <code>PIPELINE_SHARED_ROOT</code> + <code>tmp_path</code></li>
+          <li>A <b>PreToolUse hook</b> re-runs coverage and <b>blocks <code>git push</code></b> below 80%</li>
+        </ul>
+        <div class="metrics" style="margin-top:1.6rem">
+          <div class="metric"><div class="big" style="color:var(--test)">≥80%</div><div class="lbl">enforced gate</div></div>
+          <div class="metric"><div class="big" style="color:var(--docs)">≥90%</div><div class="lbl">spec target</div></div>
+          <div class="metric"><div class="big">5</div><div class="lbl">test modules</div></div>
+        </div>
+      </div>
+      <div class="card" style="border-color:rgba(234,179,8,.35);font-family:var(--mono);font-size:.8rem;line-height:1.75">
+        <div class="c" style="color:var(--dim)">$ git push</div>
+        <div style="color:var(--test)">▶ PreToolUse: coverage_gate.py</div>
+        <div style="color:var(--muted)">  running pytest --cov …</div>
+        <div style="color:var(--muted)">  TOTAL coverage: <span style="color:var(--docs)">91%</span></div>
+        <div style="color:var(--docs)">✓ gate passed — push allowed</div>
+        <div style="margin-top:10px;color:var(--dim)">— below 80% —</div>
+        <div style="color:var(--compliance)">✗ exit 2 · push denied</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 · AGENT 4 DOCS -->
+  <section class="slide">
+    <div class="reveal kicker" style="color:var(--docs)">Agent 4 of 4</div>
+    <h2 class="reveal">documentation-agent <span style="color:var(--docs)">→ ground truth</span></h2>
+    <p class="reveal lead">Writes <code>README.md</code> + <code>HOWTORUN.md</code> by reading the <b>real</b> sources —
+      so every command, path, and agent it describes actually exists. Docs only; never changes behavior.</p>
+    <div class="reveal grid3" style="margin-top:1.6rem">
+      <div class="card"><div class="tag" style="margin-bottom:10px"><b style="background:var(--docs)"></b> Reads</div>
+        <p class="lead" style="font-size:.86rem"><code>integrator.py</code>, <code>agents/*</code>, <code>frontend/</code>, <code>mcp/</code>, skills &amp; hooks, the spec</p></div>
+      <div class="card"><div class="tag" style="margin-bottom:10px"><b style="background:var(--docs)"></b> README</div>
+        <p class="lead" style="font-size:.86rem">Overview, one bullet per agent, an <b>ASCII architecture diagram</b>, tech-stack table, student name</p></div>
+      <div class="card"><div class="tag" style="margin-bottom:10px"><b style="background:var(--docs)"></b> HOWTORUN</div>
+        <p class="lead" style="font-size:.86rem">Numbered setup-to-demo steps: run pipeline, tests, MCP server, frontend, skills</p></div>
+    </div>
+    <p class="reveal lead" style="margin-top:1.2rem;font-size:.84rem;color:var(--dim)">Never exposes plaintext PII — account numbers stay masked to last 4 digits everywhere.</p>
+  </section>
+
+  <!-- 8 · RUNTIME PIPELINE (animated txn) -->
+  <section class="slide" id="slideRuntime">
+    <div class="reveal kicker" style="color:var(--frontend)">Pipeline #2 · run time</div>
+    <h2 class="reveal">A transaction's lifecycle</h2>
+    <p class="reveal lead">One JSON message flows through three cooperating agents. Every hop is atomic, idempotent, and audit-logged.</p>
+
+    <div class="reveal track">
+      <div class="railwrap">
+        <span class="node" style="left:0%"></span><span class="node" style="left:25%"></span>
+        <span class="node" style="left:50%"></span><span class="node" style="left:75%"></span>
+        <span class="node" style="left:100%"></span>
+      </div>
+      <div class="token" id="token"><span class="amt" id="tkAmt">TXN004</span><span class="st" id="tkSt">received</span></div>
+      <div class="stages" id="stages">
+        <div class="stage"><div class="box"><div class="s-name">input</div><div class="s-sub">shared/input</div></div></div>
+        <div class="stage" style="--sc:var(--validator)"><div class="box"><div class="s-name" style="color:var(--validator)">Validator</div><div class="s-sub">fields · ISO 4217</div></div></div>
+        <div class="stage" style="--sc:var(--fraud)"><div class="box"><div class="s-name" style="color:var(--fraud)">Fraud Detector</div><div class="s-sub">risk 0–100</div></div></div>
+        <div class="stage" style="--sc:var(--compliance)"><div class="box"><div class="s-name" style="color:var(--compliance)">Compliance</div><div class="s-sub">decision</div></div></div>
+        <div class="stage"><div class="box"><div class="s-name">results</div><div class="s-sub">terminal</div></div></div>
+      </div>
+    </div>
+    <div class="verdict reveal" id="verdict">$12,500 wire · press → or click ▶ to run the transaction</div>
+  </section>
+
+  <!-- 9 · PROTOCOL -->
+  <section class="slide">
+    <div class="reveal kicker">The glue between agents</div>
+    <h2 class="reveal">A file-based message protocol</h2>
+    <p class="reveal lead">Agents never call each other directly — they hand off JSON files through four folders, moved atomically with <code>tempfile</code> + <code>os.replace</code>.</p>
+    <div class="reveal dirs">
+      <div class="dir"><div class="glow"></div><h4>input/</h4><p>Envelope written per transaction_id, awaiting the validator</p></div>
+      <div class="dir"><div class="glow"></div><h4>processing/</h4><p>Transient — a message currently owned by one agent</p></div>
+      <div class="dir"><div class="glow"></div><h4>output/</h4><p>Validated / scored messages awaiting the next agent</p></div>
+      <div class="dir"><div class="glow"></div><h4>results/</h4><p>Exactly one terminal outcome + summary.json</p></div>
+    </div>
+    <div class="reveal env">
+      <div class="c"># the standard message envelope (agents/protocol.py)</div>
+      <div>{ <span class="k">"message_id"</span>: <span class="v">"…"</span>, <span class="k">"timestamp"</span>: <span class="v">"2026-…Z"</span>, <span class="k">"source_agent"</span>: <span class="v">"validator"</span>,</div>
+      <div>&nbsp;&nbsp;<span class="k">"target_agent"</span>: <span class="v">"fraud_detector"</span>, <span class="k">"message_type"</span>: <span class="v">"validated"</span>, <span class="k">"data"</span>: { … } }</div>
+    </div>
+    <p class="reveal lead" style="margin-top:1rem;font-size:.84rem;color:var(--dim)">
+      Money is only ever <code>decimal.Decimal</code> (never <code>float</code>) · audit log is append-only, ISO 8601, PII-masked · every agent is idempotent.</p>
+  </section>
+
+  <!-- 10 · TECH STACK -->
+  <section class="slide">
+    <div class="reveal kicker">Under the hood</div>
+    <h2 class="reveal">Tech stack</h2>
+    <div class="reveal card" style="margin-top:1rem;padding:6px 22px">
+      <table>
+        <thead><tr><th>Layer</th><th>Technology</th><th>Role</th></tr></thead>
+        <tbody>
+          <tr><td><b>Language</b></td><td>Python 3.11+ (dev 3.14), type-hinted</td><td>Agents, integrator, frontend, MCP</td></tr>
+          <tr><td><b>Money</b></td><td><code>decimal.Decimal</code>, ROUND_HALF_EVEN</td><td>Exact monetary arithmetic — never float</td></tr>
+          <tr><td><b>Messaging</b></td><td>File-based JSON + atomic <code>os.replace</code></td><td>Inter-agent handoff via shared/</td></tr>
+          <tr><td><b>Testing</b></td><td>pytest + pytest-cov</td><td>Per-agent + integration, ≥80% gate</td></tr>
+          <tr><td><b>Dashboard</b></td><td>FastAPI + uvicorn + vanilla JS</td><td>Read-only lifecycle UI + injector</td></tr>
+          <tr><td><b>MCP</b></td><td>FastMCP · context7</td><td>Query pipeline · docs lookup at build</td></tr>
+          <tr><td><b>Automation</b></td><td>Claude Code skills + hooks</td><td>/run-pipeline · coverage gate · audit</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 11 · CLOSE -->
+  <section class="slide">
+    <div class="reveal kicker">Wrap-up</div>
+    <h2 class="reveal">Agents all the way <span class="grad">down</span></h2>
+    <div class="reveal grid2" style="margin-top:1.2rem">
+      <ul class="clean">
+        <li><b>Spec-driven:</b> a written contract precedes any code</li>
+        <li><b>Orchestration:</b> one agent delegates to four specialized subagents, one at a time</li>
+        <li><b>Cooperation:</b> runtime agents coordinate purely through files</li>
+        <li><b>Guardrails:</b> coverage gate, PII masking, decimal money, idempotency, audit trail</li>
+      </ul>
+      <div class="card">
+        <div class="tag" style="margin-bottom:12px"><b style="background:var(--accent)"></b> Run it yourself</div>
+        <div style="font-family:var(--mono);font-size:.82rem;line-height:1.9;color:var(--muted)">
+          <div><span style="color:var(--dim)">$</span> python integrator.py</div>
+          <div><span style="color:var(--dim)">$</span> python -m pytest tests/ --cov</div>
+          <div><span style="color:var(--dim)">$</span> uvicorn frontend.server:app --reload</div>
+          <div><span style="color:var(--dim)">$</span> python mcp/server.py</div>
+        </div>
+        <p class="lead" style="font-size:.82rem;margin-top:12px">See <code>HOWTORUN.md</code> for the full walkthrough.</p>
+      </div>
+    </div>
+    <p class="reveal lead" style="margin-top:1.8rem;color:var(--dim)"><b style="color:var(--text)">Valentyn Korniienko</b> · SET University</p>
+  </section>
+
+</div>
+
+<div class="pagenum" id="pagenum">01 / 11</div>
+<div class="hud"><div class="dots" id="dots"></div></div>
+<div class="nav"><button id="prev">‹</button><button id="next">›</button></div>
+
+<script>
+  const slides=[...document.querySelectorAll('.slide')];
+  const dotsWrap=document.getElementById('dots');
+  const fill=document.getElementById('fill');
+  const pagenum=document.getElementById('pagenum');
+  let i=0;
+  slides.forEach((_,n)=>{const d=document.createElement('div');d.className='dot';
+    d.onclick=()=>go(n);dotsWrap.appendChild(d);});
+  const dots=[...document.querySelectorAll('.dot')];
+
+  function go(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach((s,k)=>s.classList.toggle('active',k===i));
+    dots.forEach((d,k)=>d.classList.toggle('on',k===i));
+    fill.style.width=((i)/(slides.length-1)*100)+'%';
+    pagenum.textContent=String(i+1).padStart(2,'0')+' / '+String(slides.length).padStart(2,'0');
+    if(slides[i].id==='slideOrch') runOrch();
+    if(slides[i].id==='slideRuntime') resetRuntime();
+  }
+  document.getElementById('next').onclick=()=>go(i+1);
+  document.getElementById('prev').onclick=()=>go(i-1);
+  window.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'||e.key===' '||e.key==='PageDown'){e.preventDefault();
+      if(slides[i].id==='slideRuntime'&&runtimeStep()) return; go(i+1);}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();go(i-1);}
+    else if(e.key==='Home')go(0); else if(e.key==='End')go(slides.length-1);
+    else if(e.key==='f'||e.key==='F'){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();}
+  });
+
+  /* ---- orchestrator fan-out sequence ---- */
+  let orchTimer=null;
+  function runOrch(){
+    const sas=[...document.querySelectorAll('#subagents .sa')];
+    sas.forEach(s=>{s.className='sa';s.querySelector('.sa-status').textContent='idle';});
+    if(orchTimer)clearTimeout(orchTimer);
+    let k=0;
+    const step=()=>{
+      sas.forEach((s,n)=>{ if(n<k){s.className='sa done';s.style.borderColor=s.dataset.c;
+        s.querySelector('.sa-status').textContent='✓ generated'; } });
+      if(k<sas.length){
+        const cur=sas[k];cur.className='sa spawning';cur.style.borderColor=cur.dataset.c;
+        cur.querySelector('.sa-status').textContent='● spawning · context7 lookup…';
+        k++; orchTimer=setTimeout(step,1300);
+      } else {
+        orchTimer=setTimeout(()=>{k=0;step();},2200); // loop
+      }
+    };
+    orchTimer=setTimeout(step,500);
+  }
+
+  /* ---- runtime transaction stepper ---- */
+  const token=document.getElementById('token');
+  const tkSt=document.getElementById('tkSt');
+  const verdict=document.getElementById('verdict');
+  const stages=[...document.querySelectorAll('#stages .stage')];
+  const seq=[
+    {x:10,st:'received', v:'$12,500 cross-border wire arrives in shared/input',c:'var(--accent)',vc:'var(--muted)'},
+    {x:30,st:'validated',v:'Validator ✓ fields present · USD is valid ISO 4217',c:'var(--validator)',vc:'var(--validator)'},
+    {x:50,st:'risk 65',v:'Fraud Detector: +50 high-value +15 cross-border → fraud_review = true',c:'var(--fraud)',vc:'var(--fraud)'},
+    {x:70,st:'flagged',v:'Compliance: ≥ $10k → requires_report · decision = flagged',c:'var(--compliance)',vc:'var(--compliance)'},
+    {x:90,st:'done',v:'Terminal outcome written to shared/results/TXN004.json + audit.log',c:'var(--docs)',vc:'var(--docs)'},
+  ];
+  let rt=0;
+  function paintRuntime(){
+    const s=seq[rt];
+    token.style.left=s.x+'%';
+    token.style.borderColor=s.c;
+    tkSt.textContent=s.st;
+    verdict.textContent=s.v; verdict.style.color=s.vc;
+    stages.forEach((st,n)=>st.classList.toggle('hot',n===rt));
+  }
+  function resetRuntime(){rt=0;paintRuntime();stages.forEach(s=>s.classList.remove('hot'));
+    token.style.left='10%';tkSt.textContent='received';
+    verdict.textContent='$12,500 cross-border wire · press → or ▶ to run the transaction';
+    verdict.style.color='var(--muted)';rt=-1;}
+  // returns true if it consumed the arrow (still stepping), false when finished
+  function runtimeStep(){ if(rt<seq.length-1){rt++;paintRuntime();return true;} return false; }
+  token.addEventListener('click',()=>{ if(!runtimeStep()){resetRuntime();} });
+  document.getElementById('verdict')?.addEventListener('click',()=>{ if(!runtimeStep()){resetRuntime();} });
+
+  go(0);
+</script>
+</body>
+</html>
