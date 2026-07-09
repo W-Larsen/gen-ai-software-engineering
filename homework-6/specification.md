@@ -54,6 +54,32 @@ third-party provider.
   coverage-gated test suite, in-process MCP tool calls, and a live frontend submission with a
   polled per-transaction status table) so M5 is demonstrable in one command with zero manual
   steps.*
+- **M6 — User-configurable pipeline stage order.** A rule-engine agent resolves the execution order of
+  ALL THREE pipeline stages (`transaction_validator`, `fraud_detector`, `compliance_checker`) for a
+  given run. The caller explicitly states the desired order — either per-submission (a `pipeline_order`
+  field on the request/message) or as a project-wide default in `agents/config/pipeline_rules.json`
+  (`default_order`) — and the engine uses it verbatim after validating it is a permutation of the fixed
+  3-agent set; when the caller specifies nothing, the documented default order
+  (`transaction_validator` → `fraud_detector` → `compliance_checker`) applies. There is no hardcoded
+  assumption that validation must run first — it is only the default, not a rule. Every agent is
+  defensive about stage order: if it receives a message lacking a field normally produced by an
+  "earlier" stage under the default order (e.g. `compliance_checker` running before `fraud_detector`
+  never sees `risk_score`), it treats the missing field as absent/false rather than raising, and the
+  actually-used order is recorded on the outgoing message and in the audit trail for traceability. The
+  integrator and frontend both consult this agent instead of hardcoding stage order.
+  *Verification: unit tests asserting the default order when the caller specifies none, the exact
+  caller-specified order when one is given (including non-default orders such as compliance before
+  fraud), and fail-closed fallback to the default when a caller-specified order is not a valid
+  permutation of the 3-agent set.*
+- **M7 — REST API gateway for arbitrary transaction submission.** `frontend/server.py` exposes
+  versioned HTTP endpoints (`POST /api/v1/transactions`, `GET /api/v1/transactions/{transaction_id}`,
+  `GET /api/v1/transactions`) that accept an arbitrary caller-supplied transaction payload (not limited
+  to `sample-transactions.json`), inject it into the real pipeline using the same
+  `protocol.build_message` construction as `/submit`, and let a client poll for the terminal result —
+  asynchronous submit-then-poll, matching the pipeline's file-queue model. Every response is PII-masked
+  identically to `/api/status`.
+  *Verification: integration test posting a synthetic transaction and polling until terminal; 404 for
+  an unknown `transaction_id`; no unmasked account number in any response body.*
 
 ## Implementation Notes
 
@@ -91,6 +117,16 @@ third-party provider.
   assumed available; both are explicitly out of scope (see High-Level Objective scope boundary)
   and any threshold comparison across currencies is documented as a stated assumption rather than
   silently approximated.
+- **Configurable stage order, never hardcoded**: the full 3-agent execution order is resolved via
+  `rule_engine.determine_pipeline_order` — caller-specified order first, then
+  `agents/config/pipeline_rules.json`'s `default_order`, then the hardcoded fallback
+  (`transaction_validator` → `fraud_detector` → `compliance_checker`) — and is never hardcoded
+  directly in `integrator.py` or `frontend/server.py`, following the same "configuration over
+  hardcoding" precedent above.
+- **Defensive field reads**: because a non-default order means a "downstream" agent may run before
+  the stage that normally produces one of its inputs, every agent reads upstream-produced fields
+  with `dict.get(...)` defaults (never assumes a prior stage already ran) instead of raising on a
+  missing key.
 
 ## Context
 
@@ -112,7 +148,11 @@ third-party provider.
 - An audit log file (e.g. `logs/audit.log`) contains one line per agent operation, matching the
   format in Implementation Notes.
 - `agents/transaction_validator.py`, `agents/fraud_detector.py`, `agents/compliance_checker.py`,
-  `integrator.py`, `frontend/server.py`, `frontend/static/index.html` all exist and are runnable.
+  `agents/rule_engine.py`, `agents/config/pipeline_rules.json`, `integrator.py`, `frontend/server.py`,
+  `frontend/static/index.html` all exist and are runnable.
+- `frontend/server.py` additionally exposes `POST /api/v1/transactions`,
+  `GET /api/v1/transactions/{transaction_id}`, and `GET /api/v1/transactions` for programmatic,
+  arbitrary-payload transaction submission and result polling.
 - `tests/` contains unit tests per agent plus one integration test; `pytest --cov` reports
   **≥ 90%** statement coverage (the coverage-gate hook in Task 3 blocks push below 80%).
 - The frontend is reachable (e.g. `uvicorn frontend.server:app`) and shows each of the 8 sample
@@ -234,6 +274,55 @@ Acceptance Criteria:
       {cleared, flagged, rejected} — verified by a reconciliation test.
 ```
 
+### Task: Rule Engine / Pipeline Orchestrator (serves: M6)
+```
+Task: Rule Engine / Pipeline Orchestrator (serves: M6)
+Prompt: "Create agents/rule_engine.py for the banking pipeline described in homework-6/specification.md.
+Implement determine_pipeline_order(requested_order: list[str] | None = None) -> list[str] that returns
+the ordered list of ALL THREE agent names to run for a transaction: some permutation of
+['transaction_validator', 'fraud_detector', 'compliance_checker']. Resolution order: (1) if
+requested_order is given (the caller -- a REST request, a batch record's own 'pipeline_order' field, or
+a direct integrator call -- explicitly names an order), validate it is a permutation of exactly those
+three names (no duplicates, no missing, no unknown agent) and return it verbatim; (2) else load
+'default_order' once from agents/config/pipeline_rules.json (defaults to
+['transaction_validator', 'fraud_detector', 'compliance_checker'] if the file/key is absent) and return
+that. On an invalid requested_order (wrong length, duplicate, or unknown name), fail closed: fall back
+to default_order and write an audit log entry (agent name 'rule_engine', outcome
+'invalid_pipeline_order_fallback') recording the rejected input. Because transaction_validator is no
+longer guaranteed to run first, every downstream agent (fraud_detector, compliance_checker) must be
+defensive: read risk_score/fraud_review/status fields with dict.get(...) defaults (never assume a prior
+stage already ran) so an out-of-default-order run degrades gracefully (e.g. compliance_checker running
+before fraud_detector treats fraud_review as False/absent) rather than raising. Update
+integrator.process_transaction and frontend/server.py's _animate to call determine_pipeline_order once
+per transaction and dispatch the three agents' process_message calls in the returned order (instead of
+the current hardcoded validator -> fraud -> compliance sequence), and to record the actually-used order
+on the outgoing message (data.pipeline_order_used) and in each stage's audit log line. Write unit tests
+in tests/test_rule_engine.py covering: no requested_order and no config file -> the fixed 3-stage
+default; a config-file default_order override; an explicit caller-supplied non-default order (e.g.
+compliance_checker before fraud_detector) returned verbatim; and an invalid requested_order (missing
+transaction_validator, or containing an unknown agent name) falling back to default with the
+'invalid_pipeline_order_fallback' audit entry."
+File to CREATE: agents/rule_engine.py
+Function to CREATE: determine_pipeline_order(requested_order: list[str] | None = None) -> list[str]
+Details: Order resolution and validation are pure (no I/O beyond the one-time config load at import,
+mirroring fraud_detector's RULES pattern) so they are independently unit-testable. Caller-specified
+order always takes precedence over the config-file default; the config-file default always takes
+precedence over the hardcoded fallback. Integrator and frontend call this function once per
+transaction, before dispatching any agent, and iterate the returned list to decide call order.
+Acceptance Criteria:
+- [ ] With no requested_order and no agents/config/pipeline_rules.json, determine_pipeline_order()
+      returns ['transaction_validator', 'fraud_detector', 'compliance_checker'] (current pipeline
+      behavior unchanged).
+- [ ] Calling determine_pipeline_order(['transaction_validator', 'compliance_checker', 'fraud_detector'])
+      returns that exact list, and integrator.process_transaction executes compliance_checker before
+      fraud_detector for that transaction without raising.
+- [ ] Calling determine_pipeline_order(['fraud_detector', 'compliance_checker']) (missing
+      transaction_validator) falls back to the default order and writes an audit log line with outcome
+      'invalid_pipeline_order_fallback'.
+- [ ] The outgoing message for every transaction carries data.pipeline_order_used equal to the order
+      that actually ran.
+```
+
 ### Task: Integrator / Orchestrator (serves: M5)
 ```
 Task: Integrator / Orchestrator (serves: M5)
@@ -301,6 +390,51 @@ Acceptance Criteria:
       page reload.
 ```
 
+### Task: REST API Gateway (serves: M7)
+```
+Task: REST API Gateway (serves: M7)
+Prompt: "Extend frontend/server.py (the existing FastAPI app) with a versioned REST API for
+programmatic transaction submission, described in homework-6/specification.md. Add: POST
+/api/v1/transactions accepting a JSON transaction payload (transaction_id optional -- generate a
+UUID-based one if absent; amount, currency, source_account, destination_account, transaction_type,
+description, metadata are caller-supplied; an optional pipeline_order list field lets the caller
+explicitly name the 3-agent execution order for this transaction) that builds a standard message via
+protocol.build_message(source_agent='api_gateway', target_agent='transaction_validator'), calls
+rule_engine.determine_pipeline_order(requested_order=payload.get('pipeline_order')) to resolve the
+full stage order, writes it to shared/input/, schedules the real pipeline in that order as a background
+task with ZERO artificial delay (unlike /submit's 1-5s animation pauses), and returns HTTP 202 with
+{transaction_id, status: 'accepted', status_url: '/api/v1/transactions/{transaction_id}'}; if the
+payload's transaction_id already has a terminal result, return HTTP 200 with the existing result
+immediately (idempotent, no reprocessing). Add GET /api/v1/transactions/{transaction_id} returning the
+current PII-masked status/result entry (same shape as an /api/status entry) or HTTP 404 if the
+transaction_id is unknown to shared/. Add GET /api/v1/transactions returning a masked list of all
+known transactions with optional ?status= and ?decision= query filters. Reuse the existing
+_collect_stage_state/_entry helpers and protocol.mask_pii -- do not duplicate status-reading logic.
+Validate the POST body has the required structural fields (transaction_id-if-present must be a
+non-empty string; amount/currency/source_account/destination_account/transaction_type must be present)
+and return HTTP 422 with a field-level error list for a structurally malformed request BEFORE it ever
+reaches the validator agent -- business-rule validation (currency code, decimal parsing) stays the
+validator agent's job, not the gateway's."
+File to MODIFY: frontend/server.py
+Function to CREATE: submit_transaction(payload: dict) -> dict (POST /api/v1/transactions handler),
+get_transaction_status(transaction_id: str) -> dict (GET /api/v1/transactions/{transaction_id} handler)
+Details: The gateway is purely a submission + read-only lookup layer -- it must not implement or
+duplicate validator/fraud/compliance/rule-engine decision logic, matching the existing frontend design
+constraint. Background execution reuses the same real agent process_message calls as /submit's
+_animate, parameterized to skip the per-stage sleep. Every response body is passed through
+protocol.mask_pii before serialization; no endpoint ever returns an unmasked account number.
+Acceptance Criteria:
+- [ ] POST /api/v1/transactions with a valid synthetic payload (no transaction_id) returns 202 with a
+      generated transaction_id, and GET /api/v1/transactions/{id} eventually reports a terminal
+      stage/decision without the caller re-POSTing.
+- [ ] POST /api/v1/transactions with a payload missing a required field (e.g. amount) returns 422 with
+      a field-level error before any file is written to shared/input/.
+- [ ] POST /api/v1/transactions re-submitting an already-terminal transaction_id returns 200 with the
+      existing stored result and does not create a duplicate result file.
+- [ ] GET /api/v1/transactions/{unknown-id} returns 404.
+- [ ] No response body from any /api/v1/* endpoint contains an unmasked account number.
+```
+
 ## Edge Cases & Failure Modes
 
 | # | Scenario | Sample Data | Expected Behavior (visible outcome) | Audit / Compliance Implication |
@@ -315,6 +449,9 @@ Acceptance Criteria:
 | 8 | Duplicate `transaction_id` | Any TXN re-submitted twice (e.g. re-run of `run_pipeline` or a re-POST via `/submit`) | Agent detects an existing `shared/results/<id>.json`; returns the stored outcome unchanged; no reprocessing, no duplicate file, no double-count in the summary | Audit logs a single `outcome='duplicate_ignored'` line referencing the original decision; summary counts stay stable across re-runs |
 | 9 | Unreadable / partial JSON | A malformed record injected into `sample-transactions.json` or a corrupted `shared/` message file | Integrator/agent skips the single bad record, writes a synthetic `status='rejected'`, `reason='malformed_input'` result, and continues processing the remaining batch — the whole run never aborts | Audit logs `outcome='rejected'` with a `parse_error=true` marker; the pipeline summary reports a distinct `malformed_input_count` |
 | 10 | Audit-write / results-write failure | Simulated disk-full or permission-denied on `shared/results/` or the audit log path | The transaction is never reported as `cleared`; the agent retries the write (assumed 3 attempts) then marks the transaction `status='error'` (held for manual ops review) rather than dropping it silently | A best-effort fallback log entry is written to a secondary local error log so ops can reconcile held transactions; `run_pipeline`'s summary surfaces an `error_count` distinct from `rejected_count` |
+| 11 | Invalid caller-specified `pipeline_order` | A `pipeline_order` missing `transaction_validator` or containing an unknown agent name, via a REST POST or a batch record's own field | `rule_engine.determine_pipeline_order` fails closed to `default_order`; the transaction still runs to a terminal outcome | Audit logs `outcome='invalid_pipeline_order_fallback'` from `rule_engine`, recording the rejected input alongside the order actually used |
+| 12 | Valid non-default `pipeline_order` | e.g. `['transaction_validator', 'compliance_checker', 'fraud_detector']` | Each stage reads any not-yet-produced upstream field (e.g. `risk_score` before `fraud_detector` has run) as absent/false instead of raising; the run still reaches a terminal decision | `data.pipeline_order_used` and each stage's audit line record the actual order, so a reviewer can see the decision was computed without a signal it would normally have had |
+| 13 | REST gateway structurally malformed payload | `POST /api/v1/transactions` body missing a required field (e.g. `amount`) | Request rejected with HTTP 422 and a field-level error list before any file reaches `shared/input/` | No audit line is written — the transaction never entered the pipeline, so there is nothing to log |
 
 ## Verification & Test Strategy
 
@@ -332,8 +469,8 @@ Acceptance Criteria:
   produces in `shared/results/` and checks `decision in {cleared, flagged, rejected}`.
 - **M4 (auditability).** A log-capture test asserts every emitted audit line matches an ISO 8601
   timestamp regex, an agent name from the closed set `{transaction_validator, fraud_detector,
-  compliance_checker, integrator}`, a `transaction_id`, and an `outcome`. A separate PII-pattern
-  scan asserts no captured log line contains an unmasked account number (regex for a full
+  compliance_checker, integrator, rule_engine, api_gateway}`, a `transaction_id`, and an `outcome`.
+  A separate PII-pattern scan asserts no captured log line contains an unmasked account number (regex for a full
   `ACC-####` pattern outside the `***`-masked form) or a `name` field. A manual compliance
   spot-check of one sample log excerpt is recorded as a sign-off step, not a substitute for the
   automated scan.
@@ -347,6 +484,19 @@ Acceptance Criteria:
   sample transactions plus 2 randomly generated ones via `/clear` + `/submit` + `/random`, and
   polling `/api/status` until every transaction reaches the `results` stage — as a reproducible,
   zero-manual-steps substitute for the manual QA pass.
+- **M6 (configurable pipeline order).** `tests/test_rule_engine.py`: table-driven test asserting the
+  default order when no `pipeline_order` is supplied and no config file is present; the config file's
+  `default_order` overriding the hardcoded fallback; an explicit caller-supplied non-default order
+  returned verbatim and honored end-to-end by `integrator.process_transaction`; and an invalid
+  `pipeline_order` (missing `transaction_validator` or containing an unknown name) falling back to
+  the default with an `invalid_pipeline_order_fallback` audit entry.
+- **M7 (REST gateway).** `tests/test_api_gateway.py`: an isolated-`tmp_path` FastAPI `TestClient`
+  integration test posting a synthetic transaction to `POST /api/v1/transactions`, asserting HTTP 202
+  plus a `status_url`, and polling `GET /api/v1/transactions/{transaction_id}` until a terminal
+  stage/decision is observed; a 422 case for a payload missing a required field with zero
+  `shared/input/` writes; a 200-with-existing-result case for re-POSTing an already-terminal
+  `transaction_id`; a 404 case for an unknown `transaction_id`; and a PII-pattern scan of every
+  `/api/v1/*` response body.
 - **Coverage.** `pytest --cov=agents --cov=frontend --cov=integrator` must report **≥ 90%**
   statement coverage; the Task 3 coverage-gate hook independently blocks any push below 80%.
 
@@ -388,3 +538,12 @@ comfortably achievable on typical development hardware while still being falsifi
   independent of the blocklist's specific contents.
 - Off-hours is defined as UTC hour `< 6`; this is a simplification that does not account for the
   account holder's local timezone and is documented as a v1 limitation.
+- The REST gateway's async submit-then-poll design means there is no server-sent push/webhook in v1;
+  a client must poll `GET /api/v1/transactions/{transaction_id}`, the same limitation `/api/status`
+  already has.
+- Allowing callers to fully reorder the pipeline (including running compliance before fraud, or
+  fraud before validation) is a deliberate v1 trade-off favoring flexibility over safety. Each
+  agent's defensive field-reading keeps a non-default order from crashing, but a decision computed
+  from a non-default order (e.g. compliance screening run before fraud scoring exists) may omit a
+  signal it would have had under the default order — this is accepted as documented behavior, not a
+  bug, and is surfaced via `data.pipeline_order_used` on every message for reviewer traceability.
