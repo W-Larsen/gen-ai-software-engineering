@@ -7,6 +7,10 @@ Claude Code meta-agents (specification, code generation, unit tests, documentati
 file-based, multi-agent banking transaction-processing pipeline from scratch, per
 [`TASKS.md`](TASKS.md) and [`specification.md`](specification.md).
 
+To see the whole system run end-to-end in one command — dependencies, pipeline, tests, MCP tools,
+and the live dashboard — run `bash demo.sh` from this directory. It needs only Python 3.11+ and
+`curl`; see [`HOWTORUN.md`](HOWTORUN.md) for the flags and for the manual equivalent of each step.
+
 ## What the system does
 
 The pipeline ingests raw banking transaction records from [`sample-transactions.json`](sample-transactions.json)

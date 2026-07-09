@@ -4,6 +4,35 @@ Copy-pasteable steps from a clean checkout to a full demo. All commands are run 
 `homework-6/` directory unless noted otherwise. Commands are shown for `bash`/PowerShell (the
 `python` invocation is identical on both).
 
+## 0. Quick start — `./demo.sh`
+
+If you just want to see everything work, run the demo script. It needs nothing installed beyond
+Python 3.11+ and `curl`, and performs every step in this document with no manual intervention:
+
+```bash
+bash demo.sh
+```
+
+It creates a local `.venv` (first run only), installs the dependencies, wipes `shared/` and
+`logs/audit.log` for a clean slate, runs the validator dry-run, runs the full pipeline, runs the
+test suite against the 80% coverage gate, calls the custom MCP tools in-process, then starts the
+dashboard, submits the 8 sample transactions plus 2 randomly generated ones, and prints a live table
+of each transaction as it moves through validator → fraud detector → compliance checker. When it
+finishes it leaves the dashboard running so you can open it in a browser; Ctrl-C stops the server.
+
+Useful flags:
+
+| Flag | Effect |
+| --- | --- |
+| `--exit` | Tear the server down and exit when the demo finishes (CI-friendly). |
+| `--slow` | Use the real 1–5s per-stage delays instead of the brisk demo delays. |
+| `--no-tests` | Skip the pytest + coverage step. |
+| `--skip-install` | Assume `.venv` already has the dependencies. |
+| `--port N` | Start the dashboard on port `N` (default 8000; walks upward if taken). |
+
+Sections 1–6 below are the manual equivalents of what `demo.sh` automates — read them to understand
+each step, or run them individually.
+
 ## 1. Prerequisites
 
 - **Python 3.11+** (this repository was developed and tested on Python 3.14.0rc2; the spec's
