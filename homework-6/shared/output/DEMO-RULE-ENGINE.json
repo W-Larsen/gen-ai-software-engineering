@@ -1,0 +1,32 @@
+{
+  "data": {
+    "amount": "5000.00",
+    "currency": "USD",
+    "description": "demo",
+    "destination_account": "ACC-4444",
+    "metadata": {
+      "channel": "api",
+      "country": "US"
+    },
+    "pipeline_order": [
+      "transaction_validator",
+      "compliance_checker",
+      "fraud_detector"
+    ],
+    "pipeline_order_used": [
+      "transaction_validator",
+      "compliance_checker",
+      "fraud_detector"
+    ],
+    "source_account": "ACC-3333",
+    "status": "validated",
+    "timestamp": "2026-07-09T12:00:00Z",
+    "transaction_id": "DEMO-RULE-ENGINE",
+    "transaction_type": "transfer"
+  },
+  "message_id": "2bed36ce-6ef6-4b10-a2c4-080f62cc2daf",
+  "message_type": "transaction",
+  "source_agent": "transaction_validator",
+  "target_agent": "compliance_checker",
+  "timestamp": "2026-07-09T17:08:20Z"
+}

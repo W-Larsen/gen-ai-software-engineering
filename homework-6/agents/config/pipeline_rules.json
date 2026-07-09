@@ -1,0 +1,4 @@
+{
+  "default_order": ["transaction_validator", "fraud_detector", "compliance_checker"],
+  "_notes": "A caller-specified pipeline_order (per REST request or per sample-record field) always overrides this default. All three agent names must be present exactly once; an invalid caller-specified order fails closed to this default_order and is audit-logged as invalid_pipeline_order_fallback."
+}

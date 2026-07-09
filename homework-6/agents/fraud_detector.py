@@ -122,18 +122,31 @@ def score_transaction(data: dict[str, Any], rules: dict[str, Any]) -> dict[str, 
     return {"risk_score": risk_score, "fraud_review": fraud_review, "signals": signals}
 
 
-def process_message(message: dict[str, Any]) -> dict[str, Any]:
+def process_message(
+    message: dict[str, Any], *, next_agent: str | None = "compliance_checker"
+) -> dict[str, Any]:
     """Score a validated transaction message for fraud risk.
 
     Reads a validated message (``data.status == "validated"``) handed off by the transaction
     validator, computes ``risk_score``/``fraud_review``/``fraud_signals`` via the pure
-    :func:`score_transaction`, stamps ``data.status = "scored"``, and forwards the message to
-    ``shared/output/`` for the compliance checker. Fraud is a signal, not a hard reject: every
-    transaction reaches this point is forwarded onward regardless of score.
+    :func:`score_transaction`, stamps ``data.status = "scored"``, and forwards the message onward to
+    ``next_agent`` via ``shared/output/`` -- ``next_agent`` defaults to ``"compliance_checker"``
+    (today's fixed pipeline order) but a caller driving a configurable stage order (see
+    ``agents.rule_engine.determine_pipeline_order``) may pass a different agent name, or ``None`` if
+    this detector is the *last* stage in the resolved order, in which case the message is written
+    directly to ``shared/results/`` instead (terminal). Fraud is a signal, not a hard reject: every
+    transaction that reaches this point is forwarded onward (or finalized) regardless of score.
 
     Idempotent: if a terminal result already exists for the transaction's id in
     ``shared/results/``, the stored outcome is returned unchanged and a single
     ``duplicate_ignored`` audit entry is logged -- the message is never re-scored or double-written.
+
+    Fail-closed: in a non-default pipeline order this detector may run *before*
+    ``transaction_validator`` and therefore see an unvalidated ``amount``/``timestamp`` that
+    :func:`score_transaction` cannot parse. Rather than raise and crash the batch, any such scoring
+    exception is caught here (only the exception's *class name* is audit-logged, never raw
+    transaction data) and the message is written as a terminal ``status="error"``,
+    ``reason=["fraud_scoring_error"]`` result -- never a silent low-risk score.
     """
     if not isinstance(message, dict):
         raise TypeError("message must be a dict")
@@ -158,7 +171,19 @@ def process_message(message: dict[str, Any]) -> dict[str, Any]:
         "destination_account": data.get("destination_account"),
     }
 
-    outcome = score_transaction(data, RULES)
+    try:
+        outcome = score_transaction(data, RULES)
+    except Exception as exc:  # noqa: BLE001 -- fail-closed catch-all, never re-raise
+        data["status"] = "error"
+        data["decision"] = "error"
+        data["reason"] = ["fraud_scoring_error"]
+        message["source_agent"] = AGENT_NAME
+        message["target_agent"] = AGENT_NAME
+        protocol.write_result(message)
+        protocol.audit_log(
+            AGENT_NAME, log_id, "error", extra={"exception": type(exc).__name__}
+        )
+        return message
 
     data["risk_score"] = outcome["risk_score"]
     data["fraud_review"] = outcome["fraud_review"]
@@ -166,8 +191,14 @@ def process_message(message: dict[str, Any]) -> dict[str, Any]:
     data["status"] = "scored"
 
     message["source_agent"] = AGENT_NAME
-    message["target_agent"] = "compliance_checker"
-    protocol.write_message(message, "output")
+
+    if next_agent is None:
+        # This detector is the last stage in the resolved pipeline order -- terminal write.
+        message["target_agent"] = AGENT_NAME
+        protocol.write_result(message)
+    else:
+        message["target_agent"] = next_agent
+        protocol.write_message(message, "output")
 
     protocol.audit_log(
         AGENT_NAME,

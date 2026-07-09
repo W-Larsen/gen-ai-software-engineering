@@ -14,6 +14,11 @@
       "channel": "online",
       "country": "GB"
     },
+    "pipeline_order_used": [
+      "transaction_validator",
+      "fraud_detector",
+      "compliance_checker"
+    ],
     "reason": [],
     "requires_report": false,
     "risk_score": 15,
@@ -23,9 +28,9 @@
     "transaction_id": "TXN007",
     "transaction_type": "refund"
   },
-  "message_id": "023e76f3-23cb-4e65-a080-71475dab4c27",
+  "message_id": "94180e11-ba71-4b09-8258-f017e535352c",
   "message_type": "transaction",
   "source_agent": "compliance_checker",
-  "target_agent": "integrator",
-  "timestamp": "2026-07-09T13:29:48Z"
+  "target_agent": "compliance_checker",
+  "timestamp": "2026-07-09T17:06:02Z"
 }

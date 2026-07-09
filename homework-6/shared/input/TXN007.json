@@ -8,14 +8,19 @@
       "channel": "online",
       "country": "GB"
     },
+    "pipeline_order_used": [
+      "transaction_validator",
+      "fraud_detector",
+      "compliance_checker"
+    ],
     "source_account": "ACC-1007",
     "timestamp": "2026-03-16T10:10:00Z",
     "transaction_id": "TXN007",
     "transaction_type": "refund"
   },
-  "message_id": "023e76f3-23cb-4e65-a080-71475dab4c27",
+  "message_id": "94180e11-ba71-4b09-8258-f017e535352c",
   "message_type": "transaction",
   "source_agent": "frontend",
   "target_agent": "transaction_validator",
-  "timestamp": "2026-07-09T13:29:48Z"
+  "timestamp": "2026-07-09T17:06:02Z"
 }

@@ -1,14 +1,15 @@
 {
   "data": {
-    "amount": "3200.00",
-    "currency": "USD",
+    "amount": "3505.47",
+    "currency": "EUR",
     "decision": "cleared",
-    "description": "Salary advance",
-    "destination_account": "ACC-9900",
+    "description": "Property settlement",
+    "destination_account": "ACC-5154",
+    "direction": "refund_credit",
     "fraud_review": false,
     "fraud_signals": [],
     "metadata": {
-      "channel": "mobile",
+      "channel": "api",
       "country": "US"
     },
     "pipeline_order_used": [
@@ -19,15 +20,15 @@
     "reason": [],
     "requires_report": false,
     "risk_score": 0,
-    "source_account": "ACC-1008",
+    "source_account": "ACC-1000",
     "status": "cleared",
-    "timestamp": "2026-03-16T10:15:00Z",
-    "transaction_id": "TXN008",
-    "transaction_type": "transfer"
+    "timestamp": "2026-07-09T12:22:01Z",
+    "transaction_id": "RND-DC44EE",
+    "transaction_type": "refund"
   },
-  "message_id": "049fbc6e-48d4-4442-bb12-c001a16a3681",
+  "message_id": "23ed42ea-e880-4142-9e33-8161b683615c",
   "message_type": "transaction",
   "source_agent": "compliance_checker",
   "target_agent": "compliance_checker",
-  "timestamp": "2026-07-09T17:06:00Z"
+  "timestamp": "2026-07-09T17:06:01Z"
 }

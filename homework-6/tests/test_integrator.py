@@ -251,6 +251,57 @@ def test_process_transaction_validator_rejection_short_circuits_before_complianc
     assert protocol.result_exists("TXN006")
 
 
+def test_process_transaction_default_order_is_stamped_on_the_result():
+    message = protocol.build_message(
+        _sample("TXN001"),
+        source_agent="integrator",
+        target_agent="transaction_validator",
+    )
+
+    result = integrator.process_transaction(message)
+
+    assert result["data"]["pipeline_order_used"] == [
+        "transaction_validator",
+        "fraud_detector",
+        "compliance_checker",
+    ]
+
+
+def test_process_transaction_honours_a_custom_pipeline_order():
+    data = _sample("TXN001")
+    data["pipeline_order"] = ["transaction_validator", "compliance_checker", "fraud_detector"]
+    message = protocol.build_message(
+        data, source_agent="integrator", target_agent="transaction_validator"
+    )
+
+    result = integrator.process_transaction(message)
+
+    assert result["data"]["pipeline_order_used"] == [
+        "transaction_validator",
+        "compliance_checker",
+        "fraud_detector",
+    ]
+    assert result["data"]["decision"] in {"cleared", "flagged", "rejected"}
+    assert protocol.result_exists("TXN001")
+
+
+def test_process_transaction_falls_back_to_default_on_invalid_pipeline_order():
+    data = _sample("TXN001")
+    data["pipeline_order"] = ["fraud_detector", "compliance_checker"]  # missing validator
+    message = protocol.build_message(
+        data, source_agent="integrator", target_agent="transaction_validator"
+    )
+
+    result = integrator.process_transaction(message)
+
+    assert result["data"]["pipeline_order_used"] == [
+        "transaction_validator",
+        "fraud_detector",
+        "compliance_checker",
+    ]
+    assert protocol.result_exists("TXN001")
+
+
 def test_process_transaction_is_idempotent_on_existing_result():
     data = _sample("TXN001")
     message = protocol.build_message(

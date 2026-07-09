@@ -138,27 +138,55 @@ def _write_malformed_result(index: int) -> str:
 
 
 def process_transaction(message: dict[str, Any]) -> dict[str, Any]:
-    """Run one message through validator -> fraud detector -> compliance checker, in order.
+    """Run one message through the three pipeline agents, in the order resolved by
+    ``agents.rule_engine.determine_pipeline_order`` -- by default validator -> fraud detector ->
+    compliance checker, but a caller may request a different order via ``data.pipeline_order`` (see
+    M6 / the Rule Engine task in ``specification.md``).
+
+    The resolved order is stamped onto ``data.pipeline_order_used`` before any agent runs, and each
+    agent is called with ``next_agent`` set to the following stage in that order (or ``None`` for
+    the last stage), so whichever agent runs last is the one that writes the terminal result.
 
     Idempotent: if a terminal result already exists for the ``transaction_id`` it is returned
     unchanged (the agents also self-guard). Returns the final result message.
     """
-    from agents import transaction_validator, fraud_detector, compliance_checker
+    from agents import transaction_validator, fraud_detector, compliance_checker, rule_engine
 
     txn_id = protocol.transaction_id_of(message)
     if txn_id and protocol.result_exists(txn_id):
         protocol.audit_log(AGENT_NAME, txn_id, "duplicate_ignored")
         return protocol.read_result(txn_id) or message
 
-    validated = transaction_validator.process_message(message)
-    status = (validated.get("data") or {}).get("status")
-    if status != "validated":
-        # Validator rejected (or errored) and already wrote a terminal result.
-        return protocol.read_result(txn_id) or validated
+    data = message.get("data")
+    if not isinstance(data, dict):
+        data = {}
+        message["data"] = data
 
-    scored = fraud_detector.process_message(validated)
-    final = compliance_checker.process_message(scored)
-    return protocol.read_result(txn_id) or final
+    # Effective idempotency/result key, mirroring protocol.write_result's own fallback so an early
+    # exit is detected correctly even for a message with a missing/blank transaction_id.
+    effective_id = txn_id or str(message.get("message_id") or "")
+
+    order = rule_engine.determine_pipeline_order(
+        requested_order=data.get("pipeline_order"), transaction_id=txn_id or None
+    )
+    data["pipeline_order_used"] = order
+
+    agent_funcs = {
+        "transaction_validator": transaction_validator.process_message,
+        "fraud_detector": fraud_detector.process_message,
+        "compliance_checker": compliance_checker.process_message,
+    }
+
+    current = message
+    for index, agent_name in enumerate(order):
+        next_agent = order[index + 1] if index + 1 < len(order) else None
+        current = agent_funcs[agent_name](current, next_agent=next_agent)
+        if effective_id and protocol.result_exists(effective_id):
+            # A terminal result now exists -- either this was the last stage, or an earlier stage
+            # (rejection / fail-closed error) short-circuited the rest of the run.
+            break
+
+    return protocol.read_result(txn_id) or current
 
 
 # ---------------------------------------------------------------------------

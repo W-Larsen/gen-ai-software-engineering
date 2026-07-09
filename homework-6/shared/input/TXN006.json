@@ -8,14 +8,19 @@
       "channel": "online",
       "country": "US"
     },
+    "pipeline_order_used": [
+      "transaction_validator",
+      "fraud_detector",
+      "compliance_checker"
+    ],
     "source_account": "ACC-1006",
     "timestamp": "2026-03-16T10:05:00Z",
     "transaction_id": "TXN006",
     "transaction_type": "transfer"
   },
-  "message_id": "c97f0064-2e41-4d9e-b353-361cbe04f1b1",
+  "message_id": "0a4857c1-935d-466d-ae32-8936a3cac772",
   "message_type": "transaction",
   "source_agent": "frontend",
   "target_agent": "transaction_validator",
-  "timestamp": "2026-07-09T13:29:48Z"
+  "timestamp": "2026-07-09T17:06:02Z"
 }

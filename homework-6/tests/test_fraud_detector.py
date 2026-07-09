@@ -200,13 +200,15 @@ def test_process_message_non_dict_data_is_coerced_before_scoring():
     )
     message["data"] = ["not", "a", "dict"]
 
-    # Coercion happens first (message["data"] becomes {}); scoring then fails closed because the
-    # coerced empty dict has neither "amount" nor "timestamp".
-    with pytest.raises(ValueError):
-        fraud_detector.process_message(message)
+    # Coercion happens first (message["data"] becomes {}); scoring then fails closed (rather than
+    # raising) because the coerced empty dict has neither "amount" nor "timestamp" -- a non-default
+    # pipeline order could otherwise route unvalidated data here, so process_message must never
+    # crash the batch.
+    result = fraud_detector.process_message(message)
 
     assert isinstance(message["data"], dict)
-    assert message["data"] == {}
+    assert result["data"]["status"] == "error"
+    assert result["data"]["reason"] == ["fraud_scoring_error"]
 
 
 # ---------------------------------------------------------------------------

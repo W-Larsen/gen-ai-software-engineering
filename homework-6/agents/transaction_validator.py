@@ -97,12 +97,19 @@ def _validate_core(
     return True, None, canonical, direction
 
 
-def process_message(message: dict[str, Any]) -> dict[str, Any]:
+def process_message(
+    message: dict[str, Any], *, next_agent: str | None = "fraud_detector"
+) -> dict[str, Any]:
     """Validate an incoming transaction message.
 
-    On success the message is routed to ``shared/output/`` (for the fraud detector) with
-    ``data.status = "validated"``. On failure it is written directly to ``shared/results/`` with
-    ``data.status = "rejected"`` and a populated ``data.reason``, bypassing fraud/compliance.
+    On success the message is routed onward to ``next_agent`` via ``shared/output/`` with
+    ``data.status = "validated"`` -- ``next_agent`` defaults to ``"fraud_detector"`` (today's fixed
+    pipeline order) but a caller driving a configurable stage order (see
+    ``agents.rule_engine.determine_pipeline_order``) may pass a different agent name, or ``None`` if
+    this validator is the *last* stage in the resolved order, in which case the message is written
+    directly to ``shared/results/`` instead (terminal). On failure the message is always written
+    directly to ``shared/results/`` with ``data.status = "rejected"`` and a populated
+    ``data.reason``, bypassing fraud/compliance regardless of ``next_agent``.
 
     Idempotent: if a result already exists for the transaction's id, the stored outcome is
     returned unchanged and a single ``duplicate_ignored`` audit entry is logged -- the message is
@@ -152,8 +159,15 @@ def process_message(message: dict[str, Any]) -> dict[str, Any]:
     if direction:
         data["direction"] = direction
     message["source_agent"] = AGENT_NAME
-    message["target_agent"] = "fraud_detector"
-    protocol.write_message(message, "output")
+
+    if next_agent is None:
+        # This validator is the last stage in the resolved pipeline order -- terminal write.
+        message["target_agent"] = AGENT_NAME
+        protocol.write_result(message)
+    else:
+        message["target_agent"] = next_agent
+        protocol.write_message(message, "output")
+
     protocol.audit_log(AGENT_NAME, log_id, "validated", extra=audit_extra)
     return message
 

@@ -14,6 +14,11 @@
       "channel": "api",
       "country": "DE"
     },
+    "pipeline_order_used": [
+      "transaction_validator",
+      "fraud_detector",
+      "compliance_checker"
+    ],
     "reason": [],
     "requires_report": false,
     "risk_score": 35,
@@ -23,9 +28,9 @@
     "transaction_id": "TXN004",
     "transaction_type": "transfer"
   },
-  "message_id": "14acd4d7-5a74-435c-bb23-abdb0bc3ed16",
+  "message_id": "4a1be712-da25-4a47-a170-55db4d34a4f6",
   "message_type": "transaction",
   "source_agent": "compliance_checker",
-  "target_agent": "integrator",
-  "timestamp": "2026-07-09T13:29:48Z"
+  "target_agent": "compliance_checker",
+  "timestamp": "2026-07-09T17:06:00Z"
 }

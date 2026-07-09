@@ -13,6 +13,11 @@
       "channel": "branch",
       "country": "US"
     },
+    "pipeline_order_used": [
+      "transaction_validator",
+      "fraud_detector",
+      "compliance_checker"
+    ],
     "reason": [
       "regulatory_reporting_threshold"
     ],
@@ -24,9 +29,9 @@
     "transaction_id": "TXN002",
     "transaction_type": "wire_transfer"
   },
-  "message_id": "71ac662f-82dd-48ab-9a10-29528ded764d",
+  "message_id": "f4a23d89-d34b-4334-811e-c3d80db80be4",
   "message_type": "transaction",
   "source_agent": "compliance_checker",
-  "target_agent": "integrator",
-  "timestamp": "2026-07-09T13:29:48Z"
+  "target_agent": "compliance_checker",
+  "timestamp": "2026-07-09T17:06:00Z"
 }

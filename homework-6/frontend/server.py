@@ -42,11 +42,11 @@ from decimal import Decimal  # noqa: E402
 from typing import Any  # noqa: E402
 
 from fastapi import FastAPI, Request  # noqa: E402
-from fastapi.responses import FileResponse  # noqa: E402
+from fastapi.responses import FileResponse, JSONResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 
 from agents import protocol  # noqa: E402
-from agents import transaction_validator, fraud_detector, compliance_checker  # noqa: E402
+from agents import transaction_validator, fraud_detector, compliance_checker, rule_engine  # noqa: E402
 import integrator  # noqa: E402
 
 APP_DIR = pathlib.Path(__file__).resolve().parent
@@ -90,6 +90,26 @@ STAGE_SCORED = "scored"
 STAGE_COMPLIANCE = "compliance"
 STAGE_RESULTS = "results"
 
+# Per-agent LIVE-tracker stage labels, keyed by *which agent is about to run / just finished* --
+# not by fixed position -- so the dashboard shows a sensible label even for a non-default
+# rule_engine-resolved order. AGENT_DONE_STAGE is only shown when that agent's write was NOT
+# terminal (i.e. it handed off to another stage); a terminal write always shows STAGE_RESULTS.
+AGENT_FUNCS = {
+    "transaction_validator": transaction_validator.process_message,
+    "fraud_detector": fraud_detector.process_message,
+    "compliance_checker": compliance_checker.process_message,
+}
+AGENT_IN_PROGRESS_STAGE = {
+    "transaction_validator": STAGE_VALIDATING,
+    "fraud_detector": STAGE_SCORING,
+    "compliance_checker": STAGE_COMPLIANCE,
+}
+AGENT_DONE_STAGE = {
+    "transaction_validator": STAGE_VALIDATED,
+    "fraud_detector": STAGE_SCORED,
+    "compliance_checker": STAGE_COMPLIANCE,
+}
+
 
 def _reason_list(reason: Any) -> list[str]:
     if isinstance(reason, list):
@@ -127,6 +147,7 @@ def _entry(txn_id: str, stage: str, data: dict[str, Any], *, last_updated: str) 
         "transaction_type": data.get("transaction_type"),
         "source_account": masked.get("source_account"),
         "destination_account": masked.get("destination_account"),
+        "pipeline_order_used": data.get("pipeline_order_used"),
         "last_updated": last_updated,
     }
 
@@ -185,50 +206,54 @@ async def _pause(lo: float, hi: float) -> None:
 
 
 async def _animate(record: dict[str, Any], lo: float, hi: float) -> None:
-    """Drive one transaction through validator -> fraud -> compliance with a pause between stages.
+    """Drive one transaction through the rule_engine-resolved agent order, pausing between stages.
 
     Calls the real agents' ``process_message`` (via ``asyncio.to_thread`` since they do blocking
-    file I/O) -- no scoring/decision logic is reimplemented here. Between each stage it updates the
-    live tracker and sleeps a random 1-5s so the dashboard animates the journey.
+    file I/O) -- no scoring/decision logic is reimplemented here. The execution order is resolved by
+    ``agents.rule_engine.determine_pipeline_order`` (honouring an optional ``record["pipeline_order"]``
+    override, defaulting to validator -> fraud -> compliance) exactly like ``integrator.py``, so a
+    non-default order is animated correctly too. Between each stage it updates the live tracker and
+    sleeps a random ``lo``-``hi`` seconds (pass ``0.0, 0.0`` for no pause, e.g. from the REST
+    gateway) so the dashboard animates the journey.
     """
     txn_id = str(record.get("transaction_id") or "").strip() or f"UNKNOWN-{uuid.uuid4().hex[:6]}"
     try:
         _reset_transaction(txn_id)
 
+        order = rule_engine.determine_pipeline_order(
+            requested_order=record.get("pipeline_order"), transaction_id=txn_id
+        )
+
         message = protocol.build_message(
             dict(record),
             source_agent=FRONTEND_AGENT_NAME,
-            target_agent="transaction_validator",
+            target_agent=order[0],
             message_type="transaction",
         )
+        message["data"]["pipeline_order_used"] = order
         protocol.write_message(message, "input")
         _set_live(txn_id, message, STAGE_RECEIVED)
         await _pause(lo, hi)
 
-        # Stage: validating.
-        _set_live(txn_id, message, STAGE_VALIDATING)
-        await _pause(lo, hi)
-        validated = await asyncio.to_thread(transaction_validator.process_message, message)
-        vdata = validated.get("data") or {}
-        if vdata.get("status") != "validated":
-            # Rejected (or errored) at validation -- terminal, bypasses fraud/compliance.
-            _set_live(txn_id, validated, STAGE_RESULTS)
-            return
-        _set_live(txn_id, validated, STAGE_VALIDATED)
-        await _pause(lo, hi)
+        current = message
+        for index, agent_name in enumerate(order):
+            next_agent = order[index + 1] if index + 1 < len(order) else None
 
-        # Stage: fraud scoring.
-        _set_live(txn_id, validated, STAGE_SCORING)
-        await _pause(lo, hi)
-        scored = await asyncio.to_thread(fraud_detector.process_message, validated)
-        _set_live(txn_id, scored, STAGE_SCORED)
-        await _pause(lo, hi)
+            _set_live(txn_id, current, AGENT_IN_PROGRESS_STAGE[agent_name])
+            await _pause(lo, hi)
 
-        # Stage: compliance screening.
-        _set_live(txn_id, scored, STAGE_COMPLIANCE)
-        await _pause(lo, hi)
-        final = await asyncio.to_thread(compliance_checker.process_message, scored)
-        _set_live(txn_id, final, STAGE_RESULTS)
+            current = await asyncio.to_thread(
+                AGENT_FUNCS[agent_name], current, next_agent=next_agent
+            )
+
+            if protocol.result_exists(txn_id):
+                # Terminal write -- either this was the last stage, or an earlier stage
+                # (rejection / fail-closed error) short-circuited the rest of the run.
+                _set_live(txn_id, current, STAGE_RESULTS)
+                return
+
+            _set_live(txn_id, current, AGENT_DONE_STAGE[agent_name])
+            await _pause(lo, hi)
     except asyncio.CancelledError:  # /clear cancelled us mid-flight -- stop quietly.
         raise
     except Exception as exc:  # fail-closed: never let one bad record crash the loop.
@@ -452,9 +477,11 @@ def _collect_stage_state() -> dict[str, tuple[str, dict[str, Any], pathlib.Path]
     return state
 
 
-@app.get("/api/status")
-def api_status() -> list[dict[str, Any]]:
-    """One JSON entry per ``transaction_id``: the on-disk view, overlaid with the live tracker."""
+def _status_entries() -> dict[str, dict[str, Any]]:
+    """One PII-masked status entry per ``transaction_id``: the on-disk view, overlaid with the live
+    tracker. Shared by ``GET /api/status`` and the ``GET /api/v1/transactions[/{id}]`` REST gateway
+    routes so status-reading logic is never duplicated.
+    """
     protocol.ensure_dirs()
 
     entries: dict[str, dict[str, Any]] = {}
@@ -466,5 +493,132 @@ def api_status() -> list[dict[str, Any]]:
     for txn_id, live in LIVE.items():
         entries[txn_id] = live
 
-    ordered = sorted(entries.values(), key=lambda e: e["transaction_id"])
-    return ordered
+    return entries
+
+
+@app.get("/api/status")
+def api_status() -> list[dict[str, Any]]:
+    """One JSON entry per ``transaction_id``: the on-disk view, overlaid with the live tracker."""
+    entries = _status_entries()
+    return sorted(entries.values(), key=lambda e: e["transaction_id"])
+
+
+# ---------------------------------------------------------------------------
+# REST API Gateway (serves M7) -- versioned endpoints for arbitrary, programmatic transaction
+# submission. Async submit-then-poll: POST returns immediately, the client polls GET for the
+# terminal outcome, matching the pipeline's real file-queue/eventual-consistency model.
+# ---------------------------------------------------------------------------
+
+# Structural fields a POST /api/v1/transactions payload must supply. Business-rule validation
+# (currency code membership, decimal parsing, refund sign rules, ...) is intentionally NOT done
+# here -- that stays agents.transaction_validator's job; the gateway only rejects a request that is
+# too malformed to even enter the pipeline.
+_GATEWAY_REQUIRED_FIELDS: tuple[str, ...] = (
+    "amount",
+    "currency",
+    "source_account",
+    "destination_account",
+    "transaction_type",
+)
+
+
+def _is_blank_field(value: Any) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+def _validate_gateway_payload(body: Any) -> list[dict[str, str]]:
+    """Structural validation only. Returns a field-level error list (empty means valid)."""
+    if not isinstance(body, dict):
+        return [{"field": "body", "message": "request body must be a JSON object"}]
+
+    errors: list[dict[str, str]] = []
+
+    txn_id = body.get("transaction_id")
+    if txn_id is not None and _is_blank_field(txn_id):
+        errors.append(
+            {"field": "transaction_id", "message": "must be a non-empty string if provided"}
+        )
+
+    for field in _GATEWAY_REQUIRED_FIELDS:
+        if _is_blank_field(body.get(field)):
+            errors.append({"field": field, "message": "required field is missing"})
+
+    return errors
+
+
+@app.post("/api/v1/transactions")
+async def submit_transaction(request: Request) -> JSONResponse:
+    """``POST /api/v1/transactions`` -- submit an arbitrary transaction payload into the real
+    pipeline (unlike ``/submit``/``/random``, which only replay ``sample-transactions.json`` or
+    generate synthetic records).
+
+    Structurally invalid payloads are rejected with HTTP 422 *before* any file reaches
+    ``shared/input/``. A payload whose ``transaction_id`` already has a terminal result is returned
+    immediately as HTTP 200 (idempotent, no reprocessing). Otherwise the transaction is scheduled
+    onto the real agent pipeline (the same ``_animate`` driver ``/submit`` uses, but with zero
+    artificial delay) and HTTP 202 is returned immediately with a ``status_url`` to poll -- this
+    endpoint never blocks for the pipeline to finish.
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            status_code=422,
+            content={"errors": [{"field": "body", "message": "request body must be valid JSON"}]},
+        )
+
+    errors = _validate_gateway_payload(body)
+    if errors:
+        return JSONResponse(status_code=422, content={"errors": errors})
+
+    protocol.ensure_dirs()
+
+    txn_id = str(body.get("transaction_id") or "").strip() or f"API-{uuid.uuid4().hex[:8].upper()}"
+
+    if protocol.result_exists(txn_id):
+        existing = protocol.read_result(txn_id) or {}
+        data = protocol.mask_pii(existing.get("data") or {})
+        return JSONResponse(status_code=200, content={"transaction_id": txn_id, **data})
+
+    record = dict(body)
+    record["transaction_id"] = txn_id
+    _schedule([record], 0.0, 0.0)
+
+    return JSONResponse(
+        status_code=202,
+        content={
+            "transaction_id": txn_id,
+            "status": "accepted",
+            "status_url": f"/api/v1/transactions/{txn_id}",
+        },
+    )
+
+
+@app.get("/api/v1/transactions/{transaction_id}")
+def get_transaction_status(transaction_id: str) -> JSONResponse:
+    """``GET /api/v1/transactions/{transaction_id}`` -- poll for the current (masked) status/result.
+
+    Reuses ``_status_entries`` -- the exact same on-disk-plus-live-tracker view ``/api/status``
+    serves -- so status-reading logic is never duplicated. Returns HTTP 404 if the id is unknown to
+    both the live tracker and every ``shared/`` sub-queue.
+    """
+    entry = _status_entries().get(transaction_id)
+    if entry is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "transaction_id not found", "transaction_id": transaction_id},
+        )
+    return JSONResponse(status_code=200, content=entry)
+
+
+@app.get("/api/v1/transactions")
+def list_transactions(status: str | None = None, decision: str | None = None) -> list[dict[str, Any]]:
+    """``GET /api/v1/transactions`` -- masked list of every known transaction, optionally filtered
+    by ``?status=`` and/or ``?decision=``. Reuses ``_status_entries`` (no duplicated logic).
+    """
+    entries = list(_status_entries().values())
+    if status is not None:
+        entries = [e for e in entries if e.get("status") == status]
+    if decision is not None:
+        entries = [e for e in entries if e.get("decision") == decision]
+    return sorted(entries, key=lambda e: e["transaction_id"])

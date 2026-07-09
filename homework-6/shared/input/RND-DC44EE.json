@@ -1,24 +1,24 @@
 {
   "data": {
-    "amount": "500.00",
+    "amount": "-3505.47",
     "currency": "EUR",
-    "description": "Invoice #4471",
-    "destination_account": "ACC-5500",
+    "description": "Property settlement",
+    "destination_account": "ACC-5154",
     "metadata": {
       "channel": "api",
-      "country": "DE"
+      "country": "US"
     },
     "pipeline_order_used": [
       "transaction_validator",
       "fraud_detector",
       "compliance_checker"
     ],
-    "source_account": "ACC-1004",
-    "timestamp": "2026-03-16T02:47:00Z",
-    "transaction_id": "TXN004",
-    "transaction_type": "transfer"
+    "source_account": "ACC-1000",
+    "timestamp": "2026-07-09T12:22:01Z",
+    "transaction_id": "RND-DC44EE",
+    "transaction_type": "refund"
   },
-  "message_id": "ca4c29e4-d310-46d8-bec7-aabdb31d6022",
+  "message_id": "23ed42ea-e880-4142-9e33-8161b683615c",
   "message_type": "transaction",
   "source_agent": "frontend",
   "target_agent": "transaction_validator",

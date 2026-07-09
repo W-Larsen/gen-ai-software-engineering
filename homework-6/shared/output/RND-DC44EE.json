@@ -1,13 +1,14 @@
 {
   "data": {
-    "amount": "9999.99",
-    "currency": "USD",
-    "description": "Consulting payment",
-    "destination_account": "ACC-9999",
+    "amount": "3505.47",
+    "currency": "EUR",
+    "description": "Property settlement",
+    "destination_account": "ACC-5154",
+    "direction": "refund_credit",
     "fraud_review": false,
     "fraud_signals": [],
     "metadata": {
-      "channel": "online",
+      "channel": "api",
       "country": "US"
     },
     "pipeline_order_used": [
@@ -16,13 +17,13 @@
       "compliance_checker"
     ],
     "risk_score": 0,
-    "source_account": "ACC-1003",
+    "source_account": "ACC-1000",
     "status": "scored",
-    "timestamp": "2026-03-16T09:30:00Z",
-    "transaction_id": "TXN003",
-    "transaction_type": "transfer"
+    "timestamp": "2026-07-09T12:22:01Z",
+    "transaction_id": "RND-DC44EE",
+    "transaction_type": "refund"
   },
-  "message_id": "4fd012e5-d485-4a2d-8643-bf2b80f9bf95",
+  "message_id": "23ed42ea-e880-4142-9e33-8161b683615c",
   "message_type": "transaction",
   "source_agent": "fraud_detector",
   "target_agent": "compliance_checker",

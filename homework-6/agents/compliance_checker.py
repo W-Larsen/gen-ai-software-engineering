@@ -183,13 +183,20 @@ def screen_transaction(
     return {"decision": decision, "reason": reasons, "requires_report": requires_report}
 
 
-def process_message(message: dict[str, Any]) -> dict[str, Any]:
+def process_message(
+    message: dict[str, Any], *, next_agent: str | None = None
+) -> dict[str, Any]:
     """Apply compliance screening to a scored transaction message and write the final outcome.
 
     Reads a scored message (``data.status == "scored"``) handed off by the fraud detector, applies
-    :func:`screen_transaction`, stamps ``data.status`` to the resulting ``decision``, and writes the
-    terminal message to ``shared/results/`` via ``protocol.write_result`` (atomic, keyed by
-    ``transaction_id``). ``decision`` is always a member of the closed set ``{cleared, flagged,
+    :func:`screen_transaction`, and stamps ``data.status`` to the resulting ``decision``.
+    ``next_agent`` defaults to ``None`` (today's fixed pipeline order, where the compliance checker
+    is always last): the message is written directly to ``shared/results/`` via
+    ``protocol.write_result`` (atomic, keyed by ``transaction_id``). A caller driving a configurable
+    stage order (see ``agents.rule_engine.determine_pipeline_order``) may instead pass the name of
+    the next agent to run, in which case the decision fields are still computed and stamped onto
+    ``data`` but the message is forwarded via ``shared/output/`` (non-terminal) instead, so a later
+    stage can still run. ``decision`` is always a member of the closed set ``{cleared, flagged,
     rejected}`` -- never any other string.
 
     Idempotent: if a terminal result already exists for the transaction's id, the stored outcome is
@@ -200,7 +207,8 @@ def process_message(message: dict[str, Any]) -> dict[str, Any]:
     unreadable config, etc.) is caught here; only the exception's *class name* is audit-logged
     (never raw account data), and the message is written with ``decision="flagged"``,
     ``reason=["compliance_screening_error"]`` -- an ambiguous/erroring transaction is never
-    silently cleared.
+    silently cleared. This fail-closed write is always terminal (to ``shared/results/``) regardless
+    of ``next_agent``, matching the other agents' fail-closed error paths.
     """
     if not isinstance(message, dict):
         raise TypeError("message must be a dict")
@@ -260,8 +268,14 @@ def process_message(message: dict[str, Any]) -> dict[str, Any]:
     # present" requirement.
 
     message["source_agent"] = AGENT_NAME
-    message["target_agent"] = "integrator"
-    protocol.write_result(message)
+
+    if next_agent is None:
+        # This checker is the last stage in the resolved pipeline order -- terminal write.
+        message["target_agent"] = AGENT_NAME
+        protocol.write_result(message)
+    else:
+        message["target_agent"] = next_agent
+        protocol.write_message(message, "output")
 
     protocol.audit_log(
         AGENT_NAME,
