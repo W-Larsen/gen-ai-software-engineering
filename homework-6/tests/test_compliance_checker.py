@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import copy
 import json
+import runpy
 import sys as _sys
 from pathlib import Path
 
@@ -285,3 +286,184 @@ def test_duplicate_transaction_with_existing_result_is_idempotent(monkeypatch):
 
     assert second["data"]["decision"] == "flagged"
     assert write_calls == []  # never re-screened/re-written
+
+
+# ---------------------------------------------------------------------------
+# _is_blank: non-string, non-None value is never blank
+# ---------------------------------------------------------------------------
+
+
+def test_is_blank_non_string_value_is_not_blank():
+    assert compliance_checker._is_blank(0) is False
+    assert compliance_checker._is_blank(123) is False
+    assert compliance_checker._is_blank([]) is False
+
+
+def test_is_blank_none_is_blank():
+    assert compliance_checker._is_blank(None) is True
+
+
+# ---------------------------------------------------------------------------
+# fraud_review_flag reason: decision flagged purely on fraud_review, with no other reason
+# ---------------------------------------------------------------------------
+
+
+def test_flagged_reason_defaults_to_fraud_review_flag_when_no_other_reason():
+    data = _scored_data("TXN001")  # amount well below the reporting threshold
+    data["fraud_review"] = True  # force a flag with no accompanying reporting/blocked reason
+
+    outcome = compliance_checker.screen_transaction(
+        data, compliance_checker.RULES, compliance_checker.BLOCKED_ACCOUNTS
+    )
+
+    assert outcome["decision"] == "flagged"
+    assert outcome["reason"] == [compliance_checker.REASON_FRAUD_REVIEW_FLAG]
+
+
+# ---------------------------------------------------------------------------
+# process_message: type/coercion defensiveness
+# ---------------------------------------------------------------------------
+
+
+def test_process_message_non_dict_message_raises_type_error():
+    with pytest.raises(TypeError):
+        compliance_checker.process_message("not-a-message")
+
+
+def test_process_message_non_dict_data_is_coerced_to_empty_dict():
+    message = protocol.build_message(
+        {}, source_agent="fraud_detector", target_agent="compliance_checker"
+    )
+    message["data"] = "not-a-dict"
+
+    result = compliance_checker.process_message(message)
+
+    assert isinstance(message["data"], dict)
+    # Coerced-to-empty data has no amount/fraud_review -- fails closed rather than crashing.
+    assert result["data"]["decision"] == "flagged"
+    assert result["data"]["reason"] == [compliance_checker.REASON_SCREENING_ERROR]
+
+
+# ---------------------------------------------------------------------------
+# Defensive: an out-of-band decision from screen_transaction is caught fail-closed
+# ---------------------------------------------------------------------------
+
+
+def test_defensive_invalid_decision_is_caught_fail_closed(monkeypatch):
+    def _bogus_screen(data, rules, blocked_accounts):
+        return {"decision": "not-a-real-decision", "reason": [], "requires_report": False}
+
+    monkeypatch.setattr(compliance_checker, "screen_transaction", _bogus_screen)
+
+    result = compliance_checker.process_message(
+        _incoming_message(_scored_data("TXN001"))
+    )
+
+    assert result["data"]["decision"] == "flagged"
+    assert result["data"]["reason"] == [compliance_checker.REASON_SCREENING_ERROR]
+
+
+# ---------------------------------------------------------------------------
+# _process_queue: drains shared/output/ for scored messages awaiting a compliance decision
+# ---------------------------------------------------------------------------
+
+
+def test_process_queue_screens_scored_message_and_writes_result():
+    protocol.write_message(_incoming_message(_scored_data("TXN001")), "output")
+
+    result = compliance_checker._process_queue()
+
+    assert result["processed"] == 1
+    assert list(protocol.shared_subdir("processing").glob("*.json")) == []
+    final = protocol.read_result("TXN001")
+    assert final["data"]["decision"] in {"cleared", "flagged", "rejected"}
+
+
+def test_process_queue_skips_malformed_json_file_without_aborting_batch():
+    output_dir = protocol.shared_subdir("output")
+    bad_path = output_dir / "BAD001.json"
+    bad_path.write_text("{not valid json", encoding="utf-8")
+
+    protocol.write_message(_incoming_message(_scored_data("TXN001")), "output")
+
+    result = compliance_checker._process_queue()
+
+    assert result["processed"] == 1
+    assert not bad_path.exists()
+
+
+def test_process_queue_leaves_non_scored_message_untouched():
+    data = _sample("TXN001")
+    data["status"] = "validated"  # not yet scored -- not this agent's turn
+    protocol.write_message(_incoming_message(data), "output")
+
+    result = compliance_checker._process_queue()
+
+    assert result["processed"] == 0
+    still_there = protocol.read_message(protocol.shared_subdir("output") / "TXN001.json")
+    assert still_there["data"]["status"] == "validated"
+
+
+def test_process_queue_tolerates_unlink_failures_on_cleanup(monkeypatch):
+    """Best-effort cleanup unlinks must never crash the batch (edge case: locked/removed file)."""
+    output_dir = protocol.shared_subdir("output")
+    bad_path = output_dir / "BAD002.json"
+    bad_path.write_text("{not valid json", encoding="utf-8")
+    protocol.write_message(_incoming_message(_scored_data("TXN001")), "output")
+
+    def _raise_unlink(self, *args, **kwargs):
+        raise OSError("simulated unlink failure")
+
+    monkeypatch.setattr(Path, "unlink", _raise_unlink)
+
+    result = compliance_checker._process_queue()
+
+    assert result["processed"] == 1
+
+
+def test_process_queue_skips_on_move_race_condition(monkeypatch):
+    """Simulate the file disappearing/mutating between the initial read and the move-to-processing
+    step (edge case: a concurrent writer corrupts the file mid-drain)."""
+    protocol.write_message(_incoming_message(_scored_data("TXN001")), "output")
+
+    def _raise(*_args, **_kwargs):
+        raise ValueError("malformed_input: simulated race")
+
+    monkeypatch.setattr(protocol, "move_message", _raise)
+
+    result = compliance_checker._process_queue()
+
+    assert result["processed"] == 0
+
+
+# ---------------------------------------------------------------------------
+# main(): CLI entrypoint, and the ``python -m`` / ``__main__`` guard
+# ---------------------------------------------------------------------------
+
+
+def test_main_drains_the_queue(capsys):
+    protocol.write_message(_incoming_message(_scored_data("TXN001")), "output")
+
+    exit_code = compliance_checker.main([])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Screened 1 message(s) from shared/output/." in captured.out
+
+
+def test_main_handles_empty_queue(capsys):
+    exit_code = compliance_checker.main([])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Screened 0 message(s) from shared/output/." in captured.out
+
+
+def test_module_dunder_main_entrypoint(monkeypatch):
+    """Exercise ``if __name__ == '__main__': raise SystemExit(main())`` directly."""
+    monkeypatch.setattr(_sys, "argv", ["compliance_checker"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        runpy.run_module("agents.compliance_checker", run_name="__main__")
+
+    assert exc_info.value.code == 0

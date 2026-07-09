@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import copy
 import json
+import runpy
 from pathlib import Path
 
 import pytest
@@ -181,3 +182,135 @@ def test_missing_country_is_not_treated_as_cross_border():
 
     assert "cross_border" not in outcome["signals"]
     assert outcome["risk_score"] == 0
+
+
+# ---------------------------------------------------------------------------
+# process_message: type/coercion defensiveness
+# ---------------------------------------------------------------------------
+
+
+def test_process_message_non_dict_message_raises_type_error():
+    with pytest.raises(TypeError):
+        fraud_detector.process_message("not-a-message")
+
+
+def test_process_message_non_dict_data_is_coerced_before_scoring():
+    message = protocol.build_message(
+        {}, source_agent="transaction_validator", target_agent="fraud_detector"
+    )
+    message["data"] = ["not", "a", "dict"]
+
+    # Coercion happens first (message["data"] becomes {}); scoring then fails closed because the
+    # coerced empty dict has neither "amount" nor "timestamp".
+    with pytest.raises(ValueError):
+        fraud_detector.process_message(message)
+
+    assert isinstance(message["data"], dict)
+    assert message["data"] == {}
+
+
+# ---------------------------------------------------------------------------
+# _process_queue: drains shared/output/ for validated messages awaiting scoring
+# ---------------------------------------------------------------------------
+
+
+def test_process_queue_scores_validated_message_and_rewrites_output():
+    protocol.write_message(_incoming_message(_sample("TXN001")), "output")
+
+    result = fraud_detector._process_queue()
+
+    assert result["processed"] == 1
+    assert list(protocol.shared_subdir("processing").glob("*.json")) == []
+    rescored = protocol.read_message(protocol.shared_subdir("output") / "TXN001.json")
+    assert rescored["data"]["status"] == "scored"
+    assert "risk_score" in rescored["data"]
+
+
+def test_process_queue_skips_malformed_json_file_without_aborting_batch():
+    output_dir = protocol.shared_subdir("output")
+    bad_path = output_dir / "BAD001.json"
+    bad_path.write_text("{not valid json", encoding="utf-8")
+
+    protocol.write_message(_incoming_message(_sample("TXN001")), "output")
+
+    result = fraud_detector._process_queue()
+
+    assert result["processed"] == 1
+    assert not bad_path.exists()
+
+
+def test_process_queue_leaves_non_validated_message_untouched():
+    data = _sample("TXN001")
+    data["status"] = "scored"  # already past this agent's stage
+    protocol.write_message(_incoming_message(data), "output")
+
+    result = fraud_detector._process_queue()
+
+    assert result["processed"] == 0
+    still_there = protocol.read_message(protocol.shared_subdir("output") / "TXN001.json")
+    assert still_there["data"]["status"] == "scored"
+
+
+def test_process_queue_tolerates_unlink_failures_on_cleanup(monkeypatch):
+    """Best-effort cleanup unlinks must never crash the batch (edge case: locked/removed file)."""
+    output_dir = protocol.shared_subdir("output")
+    bad_path = output_dir / "BAD002.json"
+    bad_path.write_text("{not valid json", encoding="utf-8")
+    protocol.write_message(_incoming_message(_sample("TXN001")), "output")
+
+    def _raise_unlink(self, *args, **kwargs):
+        raise OSError("simulated unlink failure")
+
+    monkeypatch.setattr(Path, "unlink", _raise_unlink)
+
+    result = fraud_detector._process_queue()
+
+    assert result["processed"] == 1
+
+
+def test_process_queue_skips_on_move_race_condition(monkeypatch):
+    """Simulate the file disappearing/mutating between the initial read and the move-to-processing
+    step (edge case: a concurrent writer corrupts the file mid-drain)."""
+    protocol.write_message(_incoming_message(_sample("TXN001")), "output")
+
+    def _raise(*_args, **_kwargs):
+        raise ValueError("malformed_input: simulated race")
+
+    monkeypatch.setattr(protocol, "move_message", _raise)
+
+    result = fraud_detector._process_queue()
+
+    assert result["processed"] == 0
+
+
+# ---------------------------------------------------------------------------
+# main(): CLI entrypoint, and the ``python -m`` / ``__main__`` guard
+# ---------------------------------------------------------------------------
+
+
+def test_main_drains_the_queue(capsys):
+    protocol.write_message(_incoming_message(_sample("TXN001")), "output")
+
+    exit_code = fraud_detector.main([])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Scored 1 message(s) from shared/output/." in captured.out
+
+
+def test_main_handles_empty_queue(capsys):
+    exit_code = fraud_detector.main([])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Scored 0 message(s) from shared/output/." in captured.out
+
+
+def test_module_dunder_main_entrypoint(monkeypatch):
+    """Exercise ``if __name__ == '__main__': raise SystemExit(main())`` directly."""
+    monkeypatch.setattr(_sys, "argv", ["fraud_detector"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        runpy.run_module("agents.fraud_detector", run_name="__main__")
+
+    assert exc_info.value.code == 0

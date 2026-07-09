@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 import json
+import runpy
 from decimal import Decimal
 from pathlib import Path
 
@@ -258,3 +259,145 @@ def test_dry_run_never_writes_shared_files():
 
     assert list(output_dir.glob("*.json")) == []
     assert list(results_dir.glob("*.json")) == []
+
+
+# ---------------------------------------------------------------------------
+# _is_blank: non-string, non-None value is never blank
+# ---------------------------------------------------------------------------
+
+
+def test_is_blank_non_string_value_is_not_blank():
+    assert validator._is_blank(0) is False
+    assert validator._is_blank(123) is False
+    assert validator._is_blank([]) is False
+
+
+def test_is_blank_none_is_blank():
+    assert validator._is_blank(None) is True
+
+
+# ---------------------------------------------------------------------------
+# process_message: type/coercion defensiveness
+# ---------------------------------------------------------------------------
+
+
+def test_process_message_non_dict_message_raises_type_error():
+    with pytest.raises(TypeError):
+        validator.process_message("not-a-message")
+
+
+def test_process_message_non_dict_data_is_coerced_to_empty_dict():
+    message = protocol.build_message(
+        {}, source_agent="integrator", target_agent="transaction_validator"
+    )
+    message["data"] = "not-a-dict"
+
+    result = validator.process_message(message)
+
+    assert isinstance(message["data"], dict)
+    assert result["data"]["status"] == "rejected"
+    assert result["data"]["reason"] == "missing_required_field:transaction_id"
+
+
+# ---------------------------------------------------------------------------
+# _process_queue: drains shared/input/, tolerates malformed JSON files
+# ---------------------------------------------------------------------------
+
+
+def test_process_queue_drains_valid_input_message_to_output():
+    message = _incoming_message(_sample("TXN001"))
+    protocol.write_message(message, "input")
+
+    result = validator._process_queue()
+
+    assert result["processed"] == 1
+    assert list(protocol.shared_subdir("input").glob("*.json")) == []
+    assert list(protocol.shared_subdir("processing").glob("*.json")) == []
+    assert (protocol.shared_subdir("output") / "TXN001.json").exists()
+
+
+def test_process_queue_skips_malformed_json_file_without_aborting_batch():
+    input_dir = protocol.shared_subdir("input")
+    bad_path = input_dir / "BAD001.json"
+    bad_path.write_text("{not valid json", encoding="utf-8")
+
+    good_message = _incoming_message(_sample("TXN001"))
+    protocol.write_message(good_message, "input")
+
+    result = validator._process_queue()
+
+    assert result["processed"] == 1  # only the well-formed message is counted
+    assert not bad_path.exists()  # malformed file removed rather than left to jam the queue
+    assert (protocol.shared_subdir("output") / "TXN001.json").exists()
+
+
+def test_process_queue_tolerates_unlink_failures_on_cleanup(monkeypatch):
+    """Best-effort cleanup unlinks must never crash the batch (edge case: locked/removed file)."""
+    input_dir = protocol.shared_subdir("input")
+    bad_path = input_dir / "BAD002.json"
+    bad_path.write_text("{not valid json", encoding="utf-8")
+    protocol.write_message(_incoming_message(_sample("TXN001")), "input")
+
+    def _raise_unlink(self, *args, **kwargs):
+        raise OSError("simulated unlink failure")
+
+    monkeypatch.setattr(Path, "unlink", _raise_unlink)
+
+    result = validator._process_queue()
+
+    assert result["processed"] == 1
+    assert (protocol.shared_subdir("output") / "TXN001.json").exists()
+
+
+# ---------------------------------------------------------------------------
+# --dry-run: a malformed (non-dict) record in the sample file is counted as a rejection
+# ---------------------------------------------------------------------------
+
+
+def test_dry_run_malformed_record_is_counted_as_rejection(tmp_path):
+    sample = tmp_path / "custom-sample.json"
+    sample.write_text(
+        json.dumps([_sample("TXN001"), "not-a-dict-record"]), encoding="utf-8"
+    )
+
+    stats = validator._run_dry_run(str(sample))
+
+    assert stats["total"] == 2
+    assert stats["valid"] == 1
+    assert stats["invalid"] == 1
+    assert ("not-a-dict-record", "malformed_input") in stats["rejections"]
+
+
+# ---------------------------------------------------------------------------
+# main(): non-dry-run queue path, and the ``python -m`` / ``__main__`` entrypoint
+# ---------------------------------------------------------------------------
+
+
+def test_main_without_dry_run_drains_the_queue(capsys):
+    message = _incoming_message(_sample("TXN001"))
+    protocol.write_message(message, "input")
+
+    exit_code = validator.main([])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Processed 1 message(s) from shared/input/." in captured.out
+    assert (protocol.shared_subdir("output") / "TXN001.json").exists()
+
+
+def test_main_without_dry_run_handles_empty_queue(capsys):
+    exit_code = validator.main([])
+
+    captured = capsys.readouterr()
+    assert exit_code == 0
+    assert "Processed 0 message(s) from shared/input/." in captured.out
+
+
+def test_module_dunder_main_entrypoint(monkeypatch):
+    """Exercise ``if __name__ == '__main__': raise SystemExit(main())`` directly."""
+    monkeypatch.setattr(_sys, "argv", ["transaction_validator", "--dry-run"])
+
+    with pytest.raises(SystemExit) as exc_info:
+        runpy.run_module("agents.transaction_validator", run_name="__main__")
+
+    assert exc_info.value.code == 0

@@ -99,3 +99,36 @@ Sources:
 - [Static Files - StaticFiles - FastAPI](https://fastapi.tiangolo.com/reference/staticfiles/)
 - [How can I serve static files (html, js) easily? · fastapi/fastapi Discussion #8259](https://github.com/fastapi/fastapi/discussions/8259)
 - [How to Implement Background Tasks in FastAPI](https://oneuptime.com/blog/post/2026-02-02-fastapi-background-tasks/view)
+
+## Query: pytest coverage of `if __name__ == "__main__": raise SystemExit(main())` guards, and
+   monkeypatching `Path.unlink` to simulate a filesystem error in a `_process_queue` cleanup path
+- Search: pytest runpy.run_module cover if __name__ == "__main__" guard coverage.py 2026; pytest
+  monkeypatch.setattr Path.unlink simulate OSError best practice
+- context7 MCP tool was not available in this session's toolset (no `mcp.json` entry configured for
+  it); intended target library IDs are `/pytest-dev/pytest` (monkeypatch how-to) and
+  `/nedbat/coveragepy` (coverage.py exclude-lines / subprocess-coverage docs). Backed up with a live
+  web search (see Sources below) confirming current (2026) guidance.
+- Applied: (1) Rather than excluding each agent's `if __name__ == "__main__": raise
+  SystemExit(main())` line via a `# pragma: no cover` / `coverage.py` `exclude_lines` config entry
+  (the commonly documented workaround when a module is only ever *imported* by tests), this test
+  suite instead exercises those two lines for real using `runpy.run_module("agents.<mod>",
+  run_name="__main__")` after `monkeypatch.setattr(sys, "argv", [...])`, wrapped in `pytest.raises
+  (SystemExit)` and asserting `exc_info.value.code == 0` -- `runpy.run_module` re-executes the
+  module's top-level code in the *same* process (unlike a `subprocess.run` invocation, whose
+  coverage would not be collected by the parent process's `coverage.py` run), so the dunder-main
+  guard is measured as covered without any coverage-config exclusions or `COVERAGE_PROCESS_START`
+  subprocess-coverage plumbing, for `agents/transaction_validator.py`,
+  `agents/fraud_detector.py`, and `agents/compliance_checker.py`. (2) For the defensive
+  `except OSError: pass` best-effort cleanup branches inside each agent's `_process_queue()` (the
+  `path.unlink()` / `moved_path.unlink()` calls), applied the documented
+  `monkeypatch.setattr(pathlib.Path, "unlink", fake_unlink)` pattern -- patching the *class*
+  attribute (not a single instance) so every `Path` object touched during that test raises
+  `OSError`, letting the test assert the batch still completes (`processed == 1`) rather than
+  crashing, without needing real filesystem permission tricks (which are unreliable/non-portable
+  across the Windows test environment this suite runs in).
+
+Sources:
+- [Why can't coverage the data in the "if __name__ == "__main__":" · Issue #552 · pytest-dev/pytest-cov](https://github.com/pytest-dev/pytest-cov/issues/552)
+- [`__name__ == '__main__'` block reported as not covered even though it's executing · Issue #651 · pytest-dev/pytest-cov](https://github.com/pytest-dev/pytest-cov/issues/651)
+- [How to monkeypatch/mock modules and environments - pytest documentation](https://docs.pytest.org/en/stable/how-to/monkeypatch.html)
+- [The Ultimate Guide To Using Pytest Monkeypatch with Real Code Examples | Pytest with Eric](https://pytest-with-eric.com/mocking/pytest-monkeypatch/)
