@@ -1,0 +1,9 @@
+{
+  "_notes": "Synthetic sanctioned/blocked account fixture. These accounts intentionally DO NOT overlap any account number in sample-transactions.json so sample-data behaviour is independent of this blocklist.",
+  "blocked_accounts": [
+    "ACC-BLOCK-0001",
+    "ACC-BLOCK-0002",
+    "ACC-SANCTION-9",
+    "ACC-0000000"
+  ]
+}

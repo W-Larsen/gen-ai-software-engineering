@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "pipeline-status": {
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "mcp/server.py"
+      ],
+      "env": {}
+    },
+    "context7": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ],
+      "env": {}
+    }
+  }
+}

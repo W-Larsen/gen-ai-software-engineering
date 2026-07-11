@@ -1,0 +1,11 @@
+{
+  "high_value_threshold": "10000.00",
+  "high_value_score": 50,
+  "off_hours_start_hour": 0,
+  "off_hours_end_hour": 6,
+  "off_hours_score": 20,
+  "cross_border_score": 15,
+  "home_countries": ["US"],
+  "fraud_review_threshold": 50,
+  "_notes": "Amounts are compared in the transaction's stated currency (no live FX in v1). Off-hours is UTC hour in [start, end)."
+}

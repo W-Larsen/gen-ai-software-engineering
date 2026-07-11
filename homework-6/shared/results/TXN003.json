@@ -1,0 +1,28 @@
+{
+  "data": {
+    "amount": "9999.99",
+    "currency": "USD",
+    "decision": "cleared",
+    "description": "Consulting payment",
+    "destination_account": "ACC-9999",
+    "fraud_review": false,
+    "fraud_signals": [],
+    "metadata": {
+      "channel": "online",
+      "country": "US"
+    },
+    "reason": [],
+    "requires_report": false,
+    "risk_score": 0,
+    "source_account": "ACC-1003",
+    "status": "cleared",
+    "timestamp": "2026-03-16T09:30:00Z",
+    "transaction_id": "TXN003",
+    "transaction_type": "transfer"
+  },
+  "message_id": "56925139-3b4c-479f-806c-e433de59d0ee",
+  "message_type": "transaction",
+  "source_agent": "compliance_checker",
+  "target_agent": "integrator",
+  "timestamp": "2026-07-09T13:29:48Z"
+}

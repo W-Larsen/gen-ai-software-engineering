@@ -1,0 +1,21 @@
+{
+  "data": {
+    "amount": "9999.99",
+    "currency": "USD",
+    "description": "Consulting payment",
+    "destination_account": "ACC-9999",
+    "metadata": {
+      "channel": "online",
+      "country": "US"
+    },
+    "source_account": "ACC-1003",
+    "timestamp": "2026-03-16T09:30:00Z",
+    "transaction_id": "TXN003",
+    "transaction_type": "transfer"
+  },
+  "message_id": "56925139-3b4c-479f-806c-e433de59d0ee",
+  "message_type": "transaction",
+  "source_agent": "frontend",
+  "target_agent": "transaction_validator",
+  "timestamp": "2026-07-09T13:29:48Z"
+}

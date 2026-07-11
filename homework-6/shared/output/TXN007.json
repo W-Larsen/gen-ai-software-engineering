@@ -1,0 +1,28 @@
+{
+  "data": {
+    "amount": "100.00",
+    "currency": "GBP",
+    "description": "Refund for order #8821",
+    "destination_account": "ACC-8800",
+    "direction": "refund_credit",
+    "fraud_review": false,
+    "fraud_signals": [
+      "cross_border"
+    ],
+    "metadata": {
+      "channel": "online",
+      "country": "GB"
+    },
+    "risk_score": 15,
+    "source_account": "ACC-1007",
+    "status": "scored",
+    "timestamp": "2026-03-16T10:10:00Z",
+    "transaction_id": "TXN007",
+    "transaction_type": "refund"
+  },
+  "message_id": "023e76f3-23cb-4e65-a080-71475dab4c27",
+  "message_type": "transaction",
+  "source_agent": "fraud_detector",
+  "target_agent": "compliance_checker",
+  "timestamp": "2026-07-09T13:29:48Z"
+}

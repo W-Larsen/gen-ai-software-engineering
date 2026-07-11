@@ -1,0 +1,28 @@
+{
+  "data": {
+    "amount": "1500.00",
+    "currency": "USD",
+    "decision": "cleared",
+    "description": "Monthly rent payment",
+    "destination_account": "ACC-2001",
+    "fraud_review": false,
+    "fraud_signals": [],
+    "metadata": {
+      "channel": "online",
+      "country": "US"
+    },
+    "reason": [],
+    "requires_report": false,
+    "risk_score": 0,
+    "source_account": "ACC-1001",
+    "status": "cleared",
+    "timestamp": "2026-03-16T09:00:00Z",
+    "transaction_id": "TXN001",
+    "transaction_type": "transfer"
+  },
+  "message_id": "d3694d0f-acb9-4d14-ab65-233e2e536ad8",
+  "message_type": "transaction",
+  "source_agent": "compliance_checker",
+  "target_agent": "integrator",
+  "timestamp": "2026-07-09T13:29:48Z"
+}

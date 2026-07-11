@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Banking Pipeline Dashboard</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171d2b;
+    --panel-2: #1d2536;
+    --border: #2a3346;
+    --text: #e6e9ef;
+    --muted: #93a0b4;
+    --cleared: #2ecc71;
+    --flagged: #f5a623;
+    --rejected: #e74c3c;
+    --progress: #4a90d9;
+    --idle: #3a4457;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", Roboto, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  header h1 { margin: 0; font-size: 1.35rem; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 0.82rem; }
+  .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  button {
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    background: var(--progress);
+    transition: filter .15s ease;
+  }
+  button.random { background: #7b61ff; }
+  button.danger { background: var(--rejected); }
+  button:hover { filter: brightness(1.12); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  #status-line { color: var(--muted); font-size: 0.82rem; min-height: 1.1em; padding: 0 28px; margin-top: 10px; }
+
+  .summary { display: flex; gap: 10px; flex-wrap: wrap; padding: 14px 28px 0; }
+  .stat {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 14px; min-width: 92px;
+  }
+  .stat .n { font-size: 1.25rem; font-weight: 700; }
+  .stat .l { font-size: 0.68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .stat.cleared .n { color: var(--cleared); }
+  .stat.flagged .n { color: var(--flagged); }
+  .stat.rejected .n { color: var(--rejected); }
+  .stat.progress .n { color: var(--progress); }
+
+  main { padding: 16px 28px 40px; }
+  h2.section { font-size: 0.95rem; color: var(--muted); font-weight: 600; margin: 22px 0 10px; text-transform: uppercase; letter-spacing: .05em; }
+
+  .cards { display: grid; grid-template-columns: 1fr; gap: 12px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .card.updated { animation: flash 1s ease-out; }
+  @keyframes flash {
+    0% { border-color: var(--progress); box-shadow: 0 0 0 2px rgba(74,144,217,.25); }
+    100% { border-color: var(--border); box-shadow: none; }
+  }
+  .card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .card-id { font-family: "Cascadia Code", Consolas, monospace; font-size: 0.95rem; font-weight: 700; }
+  .card-meta { color: var(--muted); font-size: 0.8rem; }
+  .card-meta .amt { color: var(--text); font-weight: 600; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 999px; font-size: 0.76rem; font-weight: 700;
+    text-transform: capitalize; color: #0b0f16;
+  }
+  .pill.cleared { background: var(--cleared); }
+  .pill.flagged { background: var(--flagged); }
+  .pill.rejected { background: var(--rejected); }
+  .pill.in_progress { background: var(--progress); color: white; }
+  .pill .spin {
+    width: 9px; height: 9px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.45); border-top-color: #fff;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---- live stepper ---- */
+  .stepper { display: flex; align-items: flex-start; overflow-x: auto; padding-bottom: 4px; }
+  .step { display: flex; flex-direction: column; align-items: center; min-width: 78px; position: relative; }
+  .step .dot {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: var(--idle); border: 2px solid var(--idle);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; color: #0b0f16; z-index: 1;
+  }
+  .step .lbl { font-size: 0.68rem; color: var(--muted); margin-top: 6px; text-align: center; }
+  .step .connector {
+    position: absolute; top: 11px; left: 50%; width: 100%; height: 3px;
+    background: var(--idle); z-index: 0;
+  }
+  .step:last-child .connector { display: none; }
+
+  .step.done .dot { background: var(--progress); border-color: var(--progress); }
+  .step.done .connector { background: var(--progress); }
+  .step.done .lbl { color: var(--text); }
+  .step.active .dot {
+    background: var(--progress); border-color: #cfe2ff;
+    box-shadow: 0 0 0 4px rgba(74,144,217,.25);
+    animation: pulse 1.1s ease-in-out infinite;
+  }
+  .step.active .lbl { color: #cfe2ff; font-weight: 700; }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 3px rgba(74,144,217,.18); }
+    50% { box-shadow: 0 0 0 7px rgba(74,144,217,.30); }
+  }
+  .step.terminal-cleared .dot { background: var(--cleared); border-color: var(--cleared); }
+  .step.terminal-cleared .connector { background: var(--cleared); }
+  .step.terminal-flagged .dot { background: var(--flagged); border-color: var(--flagged); }
+  .step.terminal-flagged .connector { background: var(--flagged); }
+  .step.terminal-rejected .dot { background: var(--rejected); border-color: var(--rejected); }
+
+  .card-bottom { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 12px; font-size: 0.82rem; }
+  .kv .k { color: var(--muted); font-size: 0.68rem; text-transform: uppercase; letter-spacing: .04em; }
+  .kv .v { color: var(--text); }
+  .reason { color: var(--flagged); }
+  .mono { font-family: "Cascadia Code", Consolas, monospace; }
+  .empty { text-align: center; color: var(--muted); padding: 40px; background: var(--panel); border: 1px dashed var(--border); border-radius: 10px; }
+  footer { padding: 14px 28px; color: var(--muted); font-size: 0.72rem; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Banking Pipeline Dashboard</h1>
+    <p>Live lifecycle: received &rarr; validating &rarr; validated &rarr; scoring &rarr; scored &rarr; compliance &rarr; done</p>
+  </div>
+  <div class="controls">
+    <button id="submit-btn">Submit sample transactions</button>
+    <button id="random-btn" class="random">Generate random transaction</button>
+    <button id="clear-btn" class="danger">Clear all</button>
+  </div>
+</header>
+<div id="status-line"></div>
+
+<div class="summary" id="summary"></div>
+
+<main>
+  <h2 class="section">Transactions</h2>
+  <div class="cards" id="cards">
+    <div class="empty">No transactions yet. Click <b>Submit sample transactions</b> or <b>Generate random transaction</b> to begin.</div>
+  </div>
+</main>
+
+<footer>Polls <span class="mono">GET /api/status</span> every 1s. The dashboard only injects &amp; observes &mdash; validation, fraud scoring and compliance decisions are made by the real pipeline agents. Accounts are shown masked.</footer>
+
+<script>
+// Canonical pipeline stages (must match server.py). Each stage a transaction passes through.
+const STAGES = ["received", "processing", "validated", "scoring", "scored", "compliance", "results"];
+const STAGE_LABELS = {
+  received: "Received", processing: "Validating", validated: "Validated",
+  scoring: "Scoring", scored: "Scored", compliance: "Compliance", results: "Done",
+};
+// On-disk stages that map onto a canonical stage.
+const STAGE_ALIAS = { input: "received" };
+
+function stageIndex(stage) {
+  const s = STAGE_ALIAS[stage] || stage;
+  const i = STAGES.indexOf(s);
+  return i < 0 ? 0 : i;
+}
+
+function terminalKind(entry) {
+  const o = entry.decision || entry.status;
+  if (o === "cleared") return "cleared";
+  if (o === "flagged") return "flagged";
+  if (o === "rejected" || o === "error") return "rejected";
+  return "flagged";
+}
+
+function isTerminal(entry) { return (STAGE_ALIAS[entry.stage] || entry.stage) === "results"; }
+
+function renderStepper(entry) {
+  const active = stageIndex(entry.stage);
+  const terminal = isTerminal(entry);
+  const tKind = terminal ? terminalKind(entry) : null;
+  let html = '<div class="stepper">';
+  STAGES.forEach((stage, i) => {
+    let cls = "step";
+    if (i < active) cls += " done";
+    else if (i === active) {
+      if (terminal) cls += " done terminal-" + tKind;
+      else cls += " active";
+    }
+    const isLastReached = terminal && i === active;
+    const mark = i < active || (terminal && i <= active) ? "&#10003;" : (i + 1);
+    html += `<div class="${cls}">
+      <span class="connector"></span>
+      <span class="dot">${(i < active || (terminal && i < active)) ? "&#10003;" : (isLastReached ? "&#9679;" : (i + 1))}</span>
+      <span class="lbl">${STAGE_LABELS[stage]}</span>
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function outcomePill(entry) {
+  if (isTerminal(entry)) {
+    const k = terminalKind(entry);
+    return `<span class="pill ${k}">${entry.decision || entry.status || k}</span>`;
+  }
+  return `<span class="pill in_progress"><span class="spin"></span>${STAGE_LABELS[STAGE_ALIAS[entry.stage] || entry.stage] || "in progress"}</span>`;
+}
+
+function fmtReason(entry) {
+  if (Array.isArray(entry.reason) && entry.reason.length) return entry.reason.join(", ");
+  return "&mdash;";
+}
+function fmtBool(v) { return v === true ? "yes" : v === false ? "no" : "&mdash;"; }
+function fmtScore(v) { return (v === null || v === undefined) ? "&mdash;" : v; }
+
+let lastSnapshot = {};
+
+function renderSummary(data) {
+  const counts = { total: data.length, cleared: 0, flagged: 0, rejected: 0, progress: 0 };
+  data.forEach((e) => {
+    if (!isTerminal(e)) { counts.progress++; return; }
+    const k = terminalKind(e);
+    counts[k]++;
+  });
+  const box = document.getElementById("summary");
+  box.innerHTML = `
+    <div class="stat"><div class="n">${counts.total}</div><div class="l">Total</div></div>
+    <div class="stat progress"><div class="n">${counts.progress}</div><div class="l">In progress</div></div>
+    <div class="stat cleared"><div class="n">${counts.cleared}</div><div class="l">Cleared</div></div>
+    <div class="stat flagged"><div class="n">${counts.flagged}</div><div class="l">Flagged</div></div>
+    <div class="stat rejected"><div class="n">${counts.rejected}</div><div class="l">Rejected</div></div>`;
+}
+
+async function refreshStatus() {
+  let data;
+  try {
+    const resp = await fetch("/api/status", { cache: "no-store" });
+    if (!resp.ok) throw new Error(`status ${resp.status}`);
+    data = await resp.json();
+  } catch (err) {
+    setStatus(`Error polling /api/status: ${err}`);
+    return;
+  }
+
+  const cards = document.getElementById("cards");
+  if (!data.length) {
+    cards.innerHTML = '<div class="empty">No transactions yet. Click <b>Submit sample transactions</b> or <b>Generate random transaction</b> to begin.</div>';
+    lastSnapshot = {};
+    renderSummary(data);
+    return;
+  }
+
+  renderSummary(data);
+  cards.innerHTML = "";
+  data.forEach((entry) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    const signature = JSON.stringify(entry);
+    if (lastSnapshot[entry.transaction_id] && lastSnapshot[entry.transaction_id] !== signature) {
+      card.classList.add("updated");
+    }
+    lastSnapshot[entry.transaction_id] = signature;
+
+    const accounts = `${entry.source_account || "?"} &rarr; ${entry.destination_account || "?"}`;
+    const amount = entry.amount != null ? `${entry.amount} ${entry.currency || ""}` : "&mdash;";
+
+    card.innerHTML = `
+      <div class="card-top">
+        <div>
+          <span class="card-id">${entry.transaction_id}</span>
+          <span class="card-meta"> &middot; <span class="amt">${amount}</span> &middot; ${entry.transaction_type || "&mdash;"}</span>
+        </div>
+        ${outcomePill(entry)}
+      </div>
+      ${renderStepper(entry)}
+      <div class="card-bottom">
+        <div class="kv"><div class="k">Accounts</div><div class="v mono">${accounts}</div></div>
+        <div class="kv"><div class="k">Risk score</div><div class="v">${fmtScore(entry.risk_score)}</div></div>
+        <div class="kv"><div class="k">Requires report</div><div class="v">${fmtBool(entry.requires_report)}</div></div>
+        <div class="kv"><div class="k">Reason</div><div class="v reason">${fmtReason(entry)}</div></div>
+        <div class="kv"><div class="k">Updated</div><div class="v mono">${entry.last_updated || "&mdash;"}</div></div>
+      </div>`;
+    cards.appendChild(card);
+  });
+
+  const inflight = data.filter((e) => !isTerminal(e)).length;
+  setStatus(`Tracking ${data.length} transaction(s), ${inflight} in progress &mdash; last poll ${new Date().toLocaleTimeString()}`);
+}
+
+function setStatus(html) { document.getElementById("status-line").innerHTML = html; }
+
+async function post(url, body) {
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  return resp.json();
+}
+
+const submitBtn = document.getElementById("submit-btn");
+const randomBtn = document.getElementById("random-btn");
+const clearBtn = document.getElementById("clear-btn");
+
+submitBtn.addEventListener("click", async () => {
+  submitBtn.disabled = true;
+  setStatus("Submitting sample transactions...");
+  try {
+    const r = await post("/submit", {});
+    setStatus(`Submitted ${r.submitted} sample transaction(s) &mdash; watch them advance through the pipeline.`);
+  } catch (e) { setStatus(`Submit failed: ${e}`); }
+  finally { submitBtn.disabled = false; refreshStatus(); }
+});
+
+randomBtn.addEventListener("click", async () => {
+  randomBtn.disabled = true;
+  setStatus("Generating a random transaction...");
+  try {
+    const r = await post("/random", { count: 1 });
+    const id = (r.transactions && r.transactions[0] && r.transactions[0].transaction_id) || "?";
+    setStatus(`Generated ${id} &mdash; processing now.`);
+  } catch (e) { setStatus(`Generate failed: ${e}`); }
+  finally { randomBtn.disabled = false; refreshStatus(); }
+});
+
+clearBtn.addEventListener("click", async () => {
+  if (!confirm("Clear all processed transactions and reset the pipeline?")) return;
+  clearBtn.disabled = true;
+  setStatus("Clearing...");
+  try {
+    const r = await post("/clear", {});
+    lastSnapshot = {};
+    setStatus(`Cleared ${r.files_removed} file(s). Pipeline reset.`);
+  } catch (e) { setStatus(`Clear failed: ${e}`); }
+  finally { clearBtn.disabled = false; refreshStatus(); }
+});
+
+// Poll every 1s so stage transitions (1-5s apart) show up live.
+refreshStatus();
+setInterval(refreshStatus, 1000);
+</script>
+</body>
+</html>

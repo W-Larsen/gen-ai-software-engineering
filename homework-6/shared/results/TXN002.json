@@ -1,0 +1,32 @@
+{
+  "data": {
+    "amount": "25000.00",
+    "currency": "USD",
+    "decision": "flagged",
+    "description": "Equipment purchase",
+    "destination_account": "ACC-3001",
+    "fraud_review": true,
+    "fraud_signals": [
+      "high_value"
+    ],
+    "metadata": {
+      "channel": "branch",
+      "country": "US"
+    },
+    "reason": [
+      "regulatory_reporting_threshold"
+    ],
+    "requires_report": true,
+    "risk_score": 50,
+    "source_account": "ACC-1002",
+    "status": "flagged",
+    "timestamp": "2026-03-16T09:15:00Z",
+    "transaction_id": "TXN002",
+    "transaction_type": "wire_transfer"
+  },
+  "message_id": "71ac662f-82dd-48ab-9a10-29528ded764d",
+  "message_type": "transaction",
+  "source_agent": "compliance_checker",
+  "target_agent": "integrator",
+  "timestamp": "2026-07-09T13:29:48Z"
+}
